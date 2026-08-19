@@ -29,6 +29,7 @@ public class ClockViewModel : ViewModelBase
     private string _monthDateText = "";
     private double _shiftX;
     private double _shiftY;
+    private double _displayOpacity = 1.0;
 
     // ── Mode toggle ──
     public bool IsAnalogMode
@@ -64,6 +65,9 @@ public class ClockViewModel : ViewModelBase
     // ── Anti-burn-in pixel shift (±4px every 3–5 min) ──
     public double ShiftX { get => _shiftX; set => SetProperty(ref _shiftX, value); }
     public double ShiftY { get => _shiftY; set => SetProperty(ref _shiftY, value); }
+
+    // ── Night dimming (11 PM – 5 AM) ──
+    public double DisplayOpacity { get => _displayOpacity; set => SetProperty(ref _displayOpacity, value); }
 
     public void ToggleMode() => IsAnalogMode = !IsAnalogMode;
 
@@ -125,5 +129,8 @@ public class ClockViewModel : ViewModelBase
         // Text versions for analog-mode right panel
         DayText       = now.ToString("ddd").ToUpper();
         MonthDateText = $"{now.Month:D2}/{now.Day:D2}";
+
+        // Dim display 11 PM – 5 AM
+        DisplayOpacity = (now.Hour >= 23 || now.Hour < 5) ? 0.3 : 1.0;
     }
 }

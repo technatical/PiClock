@@ -12,7 +12,7 @@
         <vm:ClockViewModel/>
     </Design.DataContext>
 
-    <Panel>
+    <Panel Opacity="{Binding DisplayOpacity}">
     <Grid Margin="30,30">
         <Grid.RenderTransform>
             <TranslateTransform X="{Binding ShiftX}" Y="{Binding ShiftY}"/>
