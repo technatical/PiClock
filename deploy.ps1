@@ -10,17 +10,17 @@ $target = "${User}@${Pi}"
 $remotePath = "~/PiClock"
 
 Write-Host "`n=== Publishing for linux-arm64 ===" -ForegroundColor Cyan
-dotnet publish -c Release -r linux-arm64 --self-contained true -o publish
+dotnet publish PiClock.csproj -c Release -r linux-arm64 --self-contained true -o publish
 if ($LASTEXITCODE -ne 0) { Write-Host "Build failed!" -ForegroundColor Red; exit 1 }
 
-Write-Host "`n=== Stopping PiClock service ===" -ForegroundColor Cyan
-ssh $target "sudo systemctl stop piclock 2>/dev/null; echo 'stopped'"
+Write-Host "`n=== Stopping PiClock on Pi ===" -ForegroundColor Cyan
+ssh $target "sudo systemctl stop piclock 2>/dev/null; sleep 1; pkill -f PiClock 2>/dev/null; rm -f ~/PiClock/PiClock; echo 'ready'"
 
 Write-Host "`n=== Copying files to Pi ===" -ForegroundColor Cyan
 scp -r publish/* "${target}:${remotePath}/"
 if ($LASTEXITCODE -ne 0) { Write-Host "Copy failed!" -ForegroundColor Red; exit 1 }
 
-Write-Host "`n=== Starting PiClock service ===" -ForegroundColor Cyan
-ssh $target "sudo systemctl start piclock"
+Write-Host "`n=== Setting permissions and starting ===" -ForegroundColor Cyan
+ssh $target "chmod +x ~/PiClock/PiClock; sudo systemctl start piclock"
 
 Write-Host "`n=== Deployed! ===" -ForegroundColor Green

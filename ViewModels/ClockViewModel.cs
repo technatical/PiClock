@@ -9,6 +9,7 @@ public class ClockViewModel : ViewModelBase
     private bool _isAnalogMode = true;
     private int _currentHour;
     private int _currentMinute;
+    private int _currentSecond;
     private int _hourTens;
     private int _hourOnes;
     private int _minuteTens;
@@ -35,6 +36,7 @@ public class ClockViewModel : ViewModelBase
     // ── Analog clock properties ──
     public int  CurrentHour   { get => _currentHour;   set => SetProperty(ref _currentHour, value); }
     public int  CurrentMinute { get => _currentMinute;  set => SetProperty(ref _currentMinute, value); }
+    public int  CurrentSecond { get => _currentSecond;  set => SetProperty(ref _currentSecond, value); }
 
     // ── Digital clock properties ──
     public int  HourTens     { get => _hourTens;     set => SetProperty(ref _hourTens, value); }
@@ -70,9 +72,10 @@ public class ClockViewModel : ViewModelBase
     {
         var now = DateTime.Now;
 
-        // Analog clock hands
+        // Analog clock hands (second precision for smooth sweep)
         CurrentHour   = now.Hour;
         CurrentMinute = now.Minute;
+        CurrentSecond = now.Second;
 
         // Colon blinks on each second boundary
         ColonVisible = now.Millisecond < 500;

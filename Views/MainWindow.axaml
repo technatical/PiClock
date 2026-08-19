@@ -24,6 +24,7 @@
         <controls:AnalogClock Grid.Column="0" Margin="10,0,30,0"
                               Hours="{Binding CurrentHour}"
                               Minutes="{Binding CurrentMinute}"
+                              Seconds="{Binding CurrentSecond}"
                               IsVisible="{Binding IsAnalogMode}"/>
 
         <!-- ════════════════════ LEFT: DIGITAL CLOCK (tap to toggle) ════════════════════ -->
@@ -71,7 +72,7 @@
             </Grid.RowDefinitions>
 
             <!-- Day of week — bold highway-sign text -->
-            <Viewbox Grid.Row="0" Stretch="Uniform" Margin="12,0,12,4">
+            <Viewbox Grid.Row="0" Stretch="Uniform" Margin="18,0,18,4">
                 <TextBlock Text="{Binding DayText}"
                            FontFamily="Inter"
                            FontWeight="ExtraBold"
@@ -79,8 +80,8 @@
                            LetterSpacing="2"/>
             </Viewbox>
 
-            <!-- Month / Date — wider margin = bigger text, centered under day -->
-            <Viewbox Grid.Row="1" Stretch="Uniform" Margin="0,4,0,0">
+            <!-- Month / Date — negative margin lets it stretch wider than the column padding -->
+            <Viewbox Grid.Row="1" Stretch="Uniform" Margin="-10,4,-10,0">
                 <TextBlock Text="{Binding MonthDateText}"
                            FontFamily="Inter"
                            FontWeight="ExtraBold"

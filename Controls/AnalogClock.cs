@@ -16,6 +16,9 @@ public class AnalogClock : Control
     public static readonly StyledProperty<int> MinutesProperty =
         AvaloniaProperty.Register<AnalogClock, int>(nameof(Minutes));
 
+    public static readonly StyledProperty<int> SecondsProperty =
+        AvaloniaProperty.Register<AnalogClock, int>(nameof(Seconds));
+
     public int Hours
     {
         get => GetValue(HoursProperty);
@@ -28,9 +31,15 @@ public class AnalogClock : Control
         set => SetValue(MinutesProperty, value);
     }
 
+    public int Seconds
+    {
+        get => GetValue(SecondsProperty);
+        set => SetValue(SecondsProperty, value);
+    }
+
     static AnalogClock()
     {
-        AffectsRender<AnalogClock>(HoursProperty, MinutesProperty);
+        AffectsRender<AnalogClock>(HoursProperty, MinutesProperty, SecondsProperty);
     }
 
     public override void Render(DrawingContext context)
@@ -73,16 +82,16 @@ public class AnalogClock : Control
                 numPos.Y - text.Height / 2));
         }
 
-        // ── Hour hand (short, wide) ──
-        double hourAngle = ToRadians((Hours % 12) * 30 + Minutes * 0.5 - 90);
+        // ── Hour hand (short, wide) — smooth sweep with minutes and seconds ──
+        double hourAngle = ToRadians((Hours % 12) * 30 + Minutes * 0.5 + Seconds * (0.5 / 60) - 90);
         DrawHand(context, center, hourAngle,
                  length: radius * 0.50,
                  baseHalfWidth: radius * 0.055,
                  tailLength: radius * 0.10,
                  white);
 
-        // ── Minute hand (long, thin) ──
-        double minuteAngle = ToRadians(Minutes * 6 - 90);
+        // ── Minute hand (long, thin) — smooth sweep with seconds ──
+        double minuteAngle = ToRadians(Minutes * 6 + Seconds * 0.1 - 90);
         DrawHand(context, center, minuteAngle,
                  length: radius * 0.72,
                  baseHalfWidth: radius * 0.035,
