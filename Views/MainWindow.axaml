@@ -1,0 +1,141 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:PiClock.ViewModels"
+        xmlns:controls="using:PiClock.Controls"
+        x:Class="PiClock.Views.MainWindow"
+        Title="PiClock"
+        Width="1280" Height="800"
+        WindowStartupLocation="CenterScreen"
+        Background="Black">
+
+    <Design.DataContext>
+        <vm:ClockViewModel/>
+    </Design.DataContext>
+
+    <Panel>
+    <Grid Margin="30,30">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="76*"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="24*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ════════════════════ LEFT: ANALOG CLOCK (default) ════════════════════ -->
+        <controls:AnalogClock Grid.Column="0" Margin="10,0,30,0"
+                              Hours="{Binding CurrentHour}"
+                              Minutes="{Binding CurrentMinute}"
+                              IsVisible="{Binding IsAnalogMode}"/>
+
+        <!-- ════════════════════ LEFT: DIGITAL CLOCK (tap to toggle) ════════════════════ -->
+        <Grid Grid.Column="0" Margin="10,0,30,0"
+              IsVisible="{Binding !IsAnalogMode}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1*"/>
+                <ColumnDefinition Width="1*"/>
+                <ColumnDefinition Width="0.28*"/>
+                <ColumnDefinition Width="1*"/>
+                <ColumnDefinition Width="1*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <controls:SevenSegmentDigit Grid.Column="0" Digit="{Binding HourTens}"
+                                        OnColor="White" Margin="5"/>
+            <controls:SevenSegmentDigit Grid.Column="1" Digit="{Binding HourOnes}"
+                                        OnColor="White" Margin="5"/>
+            <controls:ColonDisplay      Grid.Column="2" IsOn="{Binding ColonVisible}"
+                                        DotColor="White"/>
+            <controls:SevenSegmentDigit Grid.Column="3" Digit="{Binding MinuteTens}"
+                                        OnColor="White" Margin="5"/>
+            <controls:SevenSegmentDigit Grid.Column="4" Digit="{Binding MinuteOnes}"
+                                        OnColor="White" Margin="5"/>
+
+            <!-- AM / PM — bottom-right of the time digits -->
+            <TextBlock Grid.Column="5"
+                       Text="{Binding AmPm}"
+                       Foreground="White"
+                       FontSize="34"
+                       FontWeight="SemiBold"
+                       VerticalAlignment="Bottom"
+                       Margin="12,0,0,8"/>
+        </Grid>
+
+        <!-- Vertical separator -->
+        <Border Grid.Column="1" Width="1" Background="#224490FF" Margin="0,15"/>
+
+        <!-- ════════════════════ RIGHT: CLEAN TEXT (analog mode) ════════════════════ -->
+        <Grid Grid.Column="2" Margin="15,0,5,0" VerticalAlignment="Center"
+              IsVisible="{Binding IsAnalogMode}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Day of week — bold highway-sign text -->
+            <Viewbox Grid.Row="0" Stretch="Uniform" Margin="12,0,12,4">
+                <TextBlock Text="{Binding DayText}"
+                           FontFamily="Inter"
+                           FontWeight="ExtraBold"
+                           Foreground="#5599FF"
+                           LetterSpacing="2"/>
+            </Viewbox>
+
+            <!-- Month / Date — wider margin = bigger text, centered under day -->
+            <Viewbox Grid.Row="1" Stretch="Uniform" Margin="0,4,0,0">
+                <TextBlock Text="{Binding MonthDateText}"
+                           FontFamily="Inter"
+                           FontWeight="ExtraBold"
+                           Foreground="#5599FF"/>
+            </Viewbox>
+        </Grid>
+
+        <!-- ════════════════════ RIGHT: SEGMENT DISPLAYS (digital mode) ════════════════════ -->
+        <Grid Grid.Column="2" Margin="15,0,5,0"
+              IsVisible="{Binding !IsAnalogMode}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="1.2*"/>
+                <RowDefinition Height="1*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Day of week — 16-segment characters -->
+            <Grid Grid.Row="0" Margin="3,0,3,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1*"/>
+                    <ColumnDefinition Width="1*"/>
+                    <ColumnDefinition Width="1*"/>
+                </Grid.ColumnDefinitions>
+
+                <controls:SixteenSegmentChar Grid.Column="0" Char="{Binding DayChar1}"
+                                              OnColor="#4040ff" Margin="2"/>
+                <controls:SixteenSegmentChar Grid.Column="1" Char="{Binding DayChar2}"
+                                              OnColor="#4040ff" Margin="2"/>
+                <controls:SixteenSegmentChar Grid.Column="2" Char="{Binding DayChar3}"
+                                              OnColor="#4040ff" Margin="2"/>
+            </Grid>
+
+            <!-- Month & Date — seven-segment digits -->
+            <Grid Grid.Row="1" Margin="3,8,3,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1*"/>
+                    <ColumnDefinition Width="1*"/>
+                    <ColumnDefinition Width="0.3*"/>
+                    <ColumnDefinition Width="1*"/>
+                    <ColumnDefinition Width="1*"/>
+                </Grid.ColumnDefinitions>
+
+                <controls:SevenSegmentDigit Grid.Column="0" Digit="{Binding MonthTens}"
+                                            OnColor="#4040ff" Margin="2"/>
+                <controls:SevenSegmentDigit Grid.Column="1" Digit="{Binding MonthOnes}"
+                                            OnColor="#4040ff" Margin="2"/>
+                <!-- spacer column separates month from date -->
+                <controls:SevenSegmentDigit Grid.Column="3" Digit="{Binding DateTens}"
+                                            OnColor="#4040ff" Margin="2"/>
+                <controls:SevenSegmentDigit Grid.Column="4" Digit="{Binding DateOnes}"
+                                            OnColor="#4040ff" Margin="2"/>
+            </Grid>
+        </Grid>
+    </Grid>
+
+    <!-- 🐭 Scurrying mouse overlay -->
+    <controls:RunningMouse IsHitTestVisible="False"/>
+    </Panel>
+</Window>
