@@ -5,6 +5,8 @@ namespace PiClock.ViewModels;
 public class ClockViewModel : ViewModelBase
 {
     private readonly DispatcherTimer _timer;
+    private readonly DispatcherTimer _shiftTimer;
+    private readonly Random _shiftRandom = new();
 
     private bool _isAnalogMode = true;
     private int _currentHour;
@@ -25,6 +27,8 @@ public class ClockViewModel : ViewModelBase
     private int _dateOnes;
     private string _dayText = "";
     private string _monthDateText = "";
+    private double _shiftX;
+    private double _shiftY;
 
     // ── Mode toggle ──
     public bool IsAnalogMode
@@ -57,6 +61,10 @@ public class ClockViewModel : ViewModelBase
     public string DayText       { get => _dayText;       set => SetProperty(ref _dayText, value); }
     public string MonthDateText { get => _monthDateText; set => SetProperty(ref _monthDateText, value); }
 
+    // ── Anti-burn-in pixel shift (±4px every 3–5 min) ──
+    public double ShiftX { get => _shiftX; set => SetProperty(ref _shiftX, value); }
+    public double ShiftY { get => _shiftY; set => SetProperty(ref _shiftY, value); }
+
     public void ToggleMode() => IsAnalogMode = !IsAnalogMode;
 
     public ClockViewModel()
@@ -66,6 +74,18 @@ public class ClockViewModel : ViewModelBase
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
         _timer.Tick += (_, _) => UpdateTime();
         _timer.Start();
+
+        // Subtle pixel shift to prevent LCD image retention
+        _shiftTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(3) };
+        _shiftTimer.Tick += (_, _) => ApplyPixelShift();
+        _shiftTimer.Start();
+    }
+
+    private void ApplyPixelShift()
+    {
+        ShiftX = _shiftRandom.Next(-4, 5);
+        ShiftY = _shiftRandom.Next(-4, 5);
+        _shiftTimer.Interval = TimeSpan.FromMinutes(3 + _shiftRandom.NextDouble() * 2);
     }
 
     private void UpdateTime()
