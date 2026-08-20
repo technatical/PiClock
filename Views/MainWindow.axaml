@@ -18,19 +18,19 @@
             <TranslateTransform X="{Binding ShiftX}" Y="{Binding ShiftY}"/>
         </Grid.RenderTransform>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="74*"/>
-            <ColumnDefinition Width="26*"/>
+            <ColumnDefinition Width="60*"/>
+            <ColumnDefinition Width="40*"/>
         </Grid.ColumnDefinitions>
 
         <!-- ════════════════════ LEFT: ANALOG CLOCK (analog + calendar modes) ════════════════════ -->
-        <controls:AnalogClock Grid.Column="0" Margin="10,0,10,0"
+        <controls:AnalogClock Grid.Column="0" Margin="0,0,10,0"
                               Hours="{Binding CurrentHour}"
                               Minutes="{Binding CurrentMinute}"
                               Seconds="{Binding CurrentSecond}"
                               IsVisible="{Binding ShowAnalogClock}"/>
 
         <!-- ════════════════════ LEFT: DIGITAL CLOCK (digital mode) ════════════════════ -->
-        <Grid Grid.Column="0" Margin="10,0,10,0"
+        <Grid Grid.Column="0" Margin="0,0,10,0"
               IsVisible="{Binding IsDigitalMode}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="1*"/>

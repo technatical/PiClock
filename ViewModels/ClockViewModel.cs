@@ -8,7 +8,7 @@ public class ClockViewModel : ViewModelBase
     private readonly DispatcherTimer _shiftTimer;
     private readonly Random _shiftRandom = new();
 
-    private int _displayMode;  // 0 = Analog, 1 = Digital, 2 = Calendar
+    private int _displayMode = 2;  // 0 = Analog, 1 = Digital, 2 = Calendar (default)
     private int _currentHour;
     private int _currentMinute;
     private int _currentSecond;
