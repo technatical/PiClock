@@ -22,16 +22,16 @@
             <ColumnDefinition Width="26*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- ════════════════════ LEFT: ANALOG CLOCK (default) ════════════════════ -->
+        <!-- ════════════════════ LEFT: ANALOG CLOCK (analog + calendar modes) ════════════════════ -->
         <controls:AnalogClock Grid.Column="0" Margin="10,0,10,0"
                               Hours="{Binding CurrentHour}"
                               Minutes="{Binding CurrentMinute}"
                               Seconds="{Binding CurrentSecond}"
-                              IsVisible="{Binding IsAnalogMode}"/>
+                              IsVisible="{Binding ShowAnalogClock}"/>
 
-        <!-- ════════════════════ LEFT: DIGITAL CLOCK (tap to toggle) ════════════════════ -->
+        <!-- ════════════════════ LEFT: DIGITAL CLOCK (digital mode) ════════════════════ -->
         <Grid Grid.Column="0" Margin="10,0,10,0"
-              IsVisible="{Binding !IsAnalogMode}">
+              IsVisible="{Binding IsDigitalMode}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="1*"/>
                 <ColumnDefinition Width="1*"/>
@@ -88,9 +88,16 @@
             </Viewbox>
         </Grid>
 
+        <!-- ════════════════════ RIGHT: CALENDAR (calendar mode) ════════════════════ -->
+        <controls:MonthCalendar Grid.Column="1" Margin="5,10,10,10"
+                                Year="{Binding CurrentYear}"
+                                Month="{Binding CurrentMonthNum}"
+                                HighlightDay="{Binding CurrentDayNum}"
+                                IsVisible="{Binding IsCalendarMode}"/>
+
         <!-- ════════════════════ RIGHT: SEGMENT DISPLAYS (digital mode) ════════════════════ -->
         <Grid Grid.Column="1" Margin="10,0,10,0"
-              IsVisible="{Binding !IsAnalogMode}">
+              IsVisible="{Binding IsDigitalMode}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="1.2*"/>
                 <RowDefinition Height="1*"/>

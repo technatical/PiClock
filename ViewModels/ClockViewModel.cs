@@ -8,7 +8,7 @@ public class ClockViewModel : ViewModelBase
     private readonly DispatcherTimer _shiftTimer;
     private readonly Random _shiftRandom = new();
 
-    private bool _isAnalogMode = true;
+    private int _displayMode;  // 0 = Analog, 1 = Digital, 2 = Calendar
     private int _currentHour;
     private int _currentMinute;
     private int _currentSecond;
@@ -27,16 +27,33 @@ public class ClockViewModel : ViewModelBase
     private int _dateOnes;
     private string _dayText = "";
     private string _monthDateText = "";
+    private int _currentYear;
+    private int _currentMonthNum;
+    private int _currentDayNum;
     private double _shiftX;
     private double _shiftY;
     private double _displayOpacity = 1.0;
 
-    // ── Mode toggle ──
-    public bool IsAnalogMode
+    // ── Display mode: Analog → Digital → Calendar ──
+    public int DisplayMode
     {
-        get => _isAnalogMode;
-        set => SetProperty(ref _isAnalogMode, value);
+        get => _displayMode;
+        set
+        {
+            if (SetProperty(ref _displayMode, value))
+            {
+                OnPropertyChanged(nameof(IsAnalogMode));
+                OnPropertyChanged(nameof(IsDigitalMode));
+                OnPropertyChanged(nameof(IsCalendarMode));
+                OnPropertyChanged(nameof(ShowAnalogClock));
+            }
+        }
     }
+
+    public bool IsAnalogMode    => _displayMode == 0;
+    public bool IsDigitalMode   => _displayMode == 1;
+    public bool IsCalendarMode  => _displayMode == 2;
+    public bool ShowAnalogClock => _displayMode != 1;
 
     // ── Analog clock properties ──
     public int  CurrentHour   { get => _currentHour;   set => SetProperty(ref _currentHour, value); }
@@ -62,6 +79,11 @@ public class ClockViewModel : ViewModelBase
     public string DayText       { get => _dayText;       set => SetProperty(ref _dayText, value); }
     public string MonthDateText { get => _monthDateText; set => SetProperty(ref _monthDateText, value); }
 
+    // ── Calendar properties ──
+    public int CurrentYear     { get => _currentYear;     set => SetProperty(ref _currentYear, value); }
+    public int CurrentMonthNum { get => _currentMonthNum; set => SetProperty(ref _currentMonthNum, value); }
+    public int CurrentDayNum   { get => _currentDayNum;   set => SetProperty(ref _currentDayNum, value); }
+
     // ── Anti-burn-in pixel shift (±4px every 3–5 min) ──
     public double ShiftX { get => _shiftX; set => SetProperty(ref _shiftX, value); }
     public double ShiftY { get => _shiftY; set => SetProperty(ref _shiftY, value); }
@@ -69,7 +91,7 @@ public class ClockViewModel : ViewModelBase
     // ── Night dimming (11 PM – 5 AM) ──
     public double DisplayOpacity { get => _displayOpacity; set => SetProperty(ref _displayOpacity, value); }
 
-    public void ToggleMode() => IsAnalogMode = !IsAnalogMode;
+    public void ToggleMode() => DisplayMode = (DisplayMode + 1) % 3;
 
     public ClockViewModel()
     {
@@ -129,6 +151,11 @@ public class ClockViewModel : ViewModelBase
         // Text versions for analog-mode right panel
         DayText       = now.ToString("ddd").ToUpper();
         MonthDateText = $"{now.Month:D2}/{now.Day:D2}";
+
+        // Calendar
+        CurrentYear     = now.Year;
+        CurrentMonthNum = now.Month;
+        CurrentDayNum   = now.Day;
 
         // Dim display 11 PM – 5 AM
         DisplayOpacity = (now.Hour >= 23 || now.Hour < 5) ? 0.3 : 1.0;
