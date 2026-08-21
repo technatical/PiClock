@@ -5,9 +5,8 @@ using Avalonia.Media;
 namespace PiClock.Controls;
 
 /// <summary>
-/// Renders an analog clock face with paddle-shaped hands:
-/// thin neck from hub, smooth widening body, rounded tip.
-/// Gold second hand with counterweight.
+/// Renders an analog clock face with outlined capsule-shaped hands:
+/// white outline, light blue fill, rounded ends. Gold second hand.
 /// </summary>
 public class AnalogClock : Control
 {
@@ -54,6 +53,9 @@ public class AnalogClock : Control
         var white    = Brushes.White;
         var dimWhite = new SolidColorBrush(Color.FromArgb(64, 255, 255, 255));
         var gold     = new SolidColorBrush(Color.Parse("#FFB800"));
+        var blueFill = new SolidColorBrush(Color.Parse("#3366AA"));
+
+        double border = Math.Max(2, radius * 0.009);  // white border thickness
 
         // ── Outer circle (dimmed) ──
         var circlePen = new Pen(dimWhite, Math.Max(2, radius * 0.012));
@@ -92,21 +94,21 @@ public class AnalogClock : Control
                 numPos.Y - text.Height / 2));
         }
 
-        // ── Hour hand (short, wider paddle) ──
+        // ── Hour hand (short, wider capsule) ──
         double hourAngle = ToRadians((Hours % 12) * 30 + Minutes * 0.5 + Seconds * (0.5 / 60) - 90);
-        DrawHand(context, center, hourAngle,
-                 length: radius * 0.55,
-                 halfWidth: radius * 0.042,
-                 tailLength: radius * 0.10,
-                 white);
+        DrawCapsuleHand(context, center, hourAngle,
+                        startDist: radius * 0.06,
+                        endDist: radius * 0.52,
+                        width: radius * 0.068,
+                        border, white, blueFill);
 
-        // ── Minute hand (long paddle, nearly touching the dial) ──
+        // ── Minute hand (long, narrower capsule, nearly touching dial) ──
         double minuteAngle = ToRadians(Minutes * 6 + Seconds * 0.1 - 90);
-        DrawHand(context, center, minuteAngle,
-                 length: radius * 0.93,
-                 halfWidth: radius * 0.030,
-                 tailLength: radius * 0.10,
-                 white);
+        DrawCapsuleHand(context, center, minuteAngle,
+                        startDist: radius * 0.06,
+                        endDist: radius * 0.93,
+                        width: radius * 0.052,
+                        border, white, blueFill);
 
         // ── Second hand (thin line, gold, with counterweight) ──
         double secondAngle = ToRadians(Seconds * 6 - 90);
@@ -114,61 +116,38 @@ public class AnalogClock : Control
         var secTail = OnCircle(center, radius * 0.22, secondAngle + Math.PI);
         context.DrawLine(new Pen(gold, Math.Max(1.5, radius * 0.008)), secTail, secTip);
 
-        // ── Center hub (white disc covers hand bases, gold pivot on top) ──
-        double hubR = radius * 0.035;
+        // ── Center hub (covers hand bases) ──
+        double hubR = radius * 0.045;
         context.DrawEllipse(white, null, center, hubR, hubR);
-        double goldR = radius * 0.02;
+        double innerR = radius * 0.032;
+        context.DrawEllipse(new SolidColorBrush(Color.Parse("#222222")), null, center, innerR, innerR);
+        double goldR = radius * 0.015;
         context.DrawEllipse(gold, null, center, goldR, goldR);
     }
 
     /// <summary>
-    /// Draws a paddle-shaped hand: thin neck from hub → smooth bezier
-    /// widening → constant-width blade → rounded semicircular tip.
-    /// The hub circle covers the base, so only the neck outward is visible.
+    /// Draws a capsule-shaped (stadium) hand using thick lines with rounded caps.
+    /// White outline drawn first, then narrower blue fill on top.
     /// </summary>
-    private static void DrawHand(DrawingContext context, Point center, double angle,
-        double length, double halfWidth, double tailLength, IBrush brush)
+    private static void DrawCapsuleHand(DrawingContext context, Point center, double angle,
+        double startDist, double endDist, double width, double border, IBrush outline, IBrush fill)
     {
-        double perp = angle + Math.PI / 2;
-        double neckHalf = halfWidth * 0.20;  // thin neck
+        var start = OnCircle(center, startDist, angle);
+        var end   = OnCircle(center, endDist, angle);
 
-        // ── Key points along the hand axis ──
-        var neckPt     = OnCircle(center, length * 0.08, angle);   // start of visible neck
-        var shoulderPt = OnCircle(center, length * 0.72, angle);   // where it reaches full width
-        var tipPt      = OnCircle(center, length, angle);           // end of hand
-        var tailPt     = OnCircle(center, tailLength, angle + Math.PI);
+        // White outline (full width, rounded ends)
+        context.DrawLine(
+            new Pen(outline, width) { LineCap = PenLineCap.Round },
+            start, end);
 
-        // ── Perpendicular offsets at each station ──
-        var neckR     = Offset(neckPt, perp, neckHalf);
-        var neckL     = Offset(neckPt, perp, -neckHalf);
-        var shoulderR = Offset(shoulderPt, perp, halfWidth);
-        var shoulderL = Offset(shoulderPt, perp, -halfWidth);
-        var tipR      = Offset(tipPt, perp, halfWidth);
-        var tipL      = Offset(tipPt, perp, -halfWidth);
-        var tailR     = Offset(tailPt, perp, neckHalf);
-        var tailL     = Offset(tailPt, perp, -neckHalf);
-
-        // ── Bezier control points for smooth widening (at ~40% length, still thin) ──
-        var ctrlPt = OnCircle(center, length * 0.40, angle);
-        var ctrlR  = Offset(ctrlPt, perp, halfWidth * 0.30);
-        var ctrlL  = Offset(ctrlPt, perp, -halfWidth * 0.30);
-
-        var geo = new StreamGeometry();
-        using (var ctx = geo.Open())
+        // Blue fill (narrower, exposing white border on all sides)
+        double fillWidth = width - border * 2;
+        if (fillWidth > 0)
         {
-            ctx.BeginFigure(tailR, true);
-            ctx.LineTo(neckR);                                          // thin tail to neck
-            ctx.QuadraticBezierTo(ctrlR, shoulderR);                   // smooth widening
-            ctx.LineTo(tipR);                                           // constant width to tip edge
-            ctx.ArcTo(tipL, new Size(halfWidth, halfWidth),            // rounded cap
-                      0, false, SweepDirection.Clockwise);
-            ctx.LineTo(shoulderL);                                      // tip edge back to shoulder
-            ctx.QuadraticBezierTo(ctrlL, neckL);                       // smooth narrowing
-            ctx.LineTo(tailL);                                          // neck to tail
-            ctx.EndFigure(true);
+            context.DrawLine(
+                new Pen(fill, fillWidth) { LineCap = PenLineCap.Round },
+                start, end);
         }
-
-        context.DrawGeometry(brush, null, geo);
     }
 
     private static double ToRadians(double degrees) => degrees * Math.PI / 180;
@@ -176,8 +155,4 @@ public class AnalogClock : Control
     private static Point OnCircle(Point center, double radius, double angleRadians) =>
         new(center.X + radius * Math.Cos(angleRadians),
             center.Y + radius * Math.Sin(angleRadians));
-
-    private static Point Offset(Point p, double perpAngle, double distance) =>
-        new(p.X + distance * Math.Cos(perpAngle),
-            p.Y + distance * Math.Sin(perpAngle));
 }
