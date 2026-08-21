@@ -100,7 +100,7 @@ public class AnalogClock : Control
         DrawCapsuleHand(context, center, hourAngle,
                         startDist: radius * 0.17,
                         endDist: radius * 0.52,
-                        width: radius * 0.068,
+                        width: radius * 0.090,
                         border, white, blueFill);
 
         // ── Minute hand (thin stem + narrower capsule, nearly touching dial) ──
@@ -109,7 +109,7 @@ public class AnalogClock : Control
         DrawCapsuleHand(context, center, minuteAngle,
                         startDist: radius * 0.17,
                         endDist: radius * 0.93,
-                        width: radius * 0.052,
+                        width: radius * 0.070,
                         border, white, blueFill);
 
         // ── Second hand (thin line, gold, with counterweight) ──
