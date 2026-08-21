@@ -42,22 +42,24 @@ public class MonthCalendar : Control
 
         // ── Layout proportions ──
         double cellW      = size.Width / 7;
-        double headerH    = size.Height * 0.16;   // month name
-        double dayHeaderH = size.Height * 0.10;   // S M T W T F S
+        double headerH    = size.Height * 0.22;   // "Aug 20" header
+        double dayHeaderH = size.Height * 0.08;   // S M T W T F S
         double gridH      = size.Height - headerH - dayHeaderH;
         double cellH      = gridH / 6;
         double fontSize   = Math.Min(cellW, cellH) * 0.42;
 
-        // ── Month name (gold, left-aligned) ──
-        var monthName = new DateTime(Year, Month, 1).ToString("MMMM");
-        var monthText = new FormattedText(
-            monthName,
+        // ── Month + Day header (gold, left-aligned, abbreviated) ──
+        var dt = new DateTime(Year, Month, 1);
+        string headerLabel = $"{dt.ToString("MMM")} {HighlightDay}";
+        double headerFontSize = fontSize * 2.2;
+        var headerText = new FormattedText(
+            headerLabel,
             System.Globalization.CultureInfo.CurrentCulture,
             FlowDirection.LeftToRight,
             boldTypeface,
-            fontSize * 1.5,
+            headerFontSize,
             gold);
-        context.DrawText(monthText, new Point(cellW * 0.15, (headerH - monthText.Height) / 2));
+        context.DrawText(headerText, new Point(cellW * 0.15, (headerH - headerText.Height) / 2));
 
         // ── Day-of-week headers ──
         string[] headers = ["S", "M", "T", "W", "T", "F", "S"];
