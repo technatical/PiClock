@@ -48,10 +48,10 @@ public class MonthCalendar : Control
         double cellH      = gridH / 6;
         double fontSize   = Math.Min(cellW, cellH) * 0.42;
 
-        // ── Month + Day header (gold, left-aligned, abbreviated) ──
+        // ── Month + Day header (gold, centered, abbreviated) ──
         var dt = new DateTime(Year, Month, 1);
         string headerLabel = $"{dt.ToString("MMM")} {HighlightDay}";
-        double headerFontSize = fontSize * 2.2;
+        double headerFontSize = fontSize * 2.8;
         var headerText = new FormattedText(
             headerLabel,
             System.Globalization.CultureInfo.CurrentCulture,
@@ -59,7 +59,9 @@ public class MonthCalendar : Control
             boldTypeface,
             headerFontSize,
             gold);
-        context.DrawText(headerText, new Point(cellW * 0.15, (headerH - headerText.Height) / 2));
+        context.DrawText(headerText, new Point(
+            (size.Width - headerText.Width) / 2,
+            (headerH - headerText.Height) / 2));
 
         // ── Day-of-week headers ──
         string[] headers = ["S", "M", "T", "W", "T", "F", "S"];

@@ -94,18 +94,20 @@ public class AnalogClock : Control
                 numPos.Y - text.Height / 2));
         }
 
-        // ── Hour hand (short, wider capsule) ──
+        // ── Hour hand (thin stem + wider capsule) ──
         double hourAngle = ToRadians((Hours % 12) * 30 + Minutes * 0.5 + Seconds * (0.5 / 60) - 90);
+        DrawStem(context, center, hourAngle, radius * 0.05, radius * 0.17, radius * 0.016, white);
         DrawCapsuleHand(context, center, hourAngle,
-                        startDist: radius * 0.06,
+                        startDist: radius * 0.17,
                         endDist: radius * 0.52,
                         width: radius * 0.068,
                         border, white, blueFill);
 
-        // ── Minute hand (long, narrower capsule, nearly touching dial) ──
+        // ── Minute hand (thin stem + narrower capsule, nearly touching dial) ──
         double minuteAngle = ToRadians(Minutes * 6 + Seconds * 0.1 - 90);
+        DrawStem(context, center, minuteAngle, radius * 0.05, radius * 0.17, radius * 0.016, white);
         DrawCapsuleHand(context, center, minuteAngle,
-                        startDist: radius * 0.06,
+                        startDist: radius * 0.17,
                         endDist: radius * 0.93,
                         width: radius * 0.052,
                         border, white, blueFill);
@@ -123,6 +125,17 @@ public class AnalogClock : Control
         context.DrawEllipse(new SolidColorBrush(Color.Parse("#222222")), null, center, innerR, innerR);
         double goldR = radius * 0.015;
         context.DrawEllipse(gold, null, center, goldR, goldR);
+    }
+
+    /// <summary>
+    /// Draws the thin stem/neck between the hub and the capsule body.
+    /// </summary>
+    private static void DrawStem(DrawingContext context, Point center, double angle,
+        double startDist, double endDist, double width, IBrush brush)
+    {
+        var start = OnCircle(center, startDist, angle);
+        var end   = OnCircle(center, endDist, angle);
+        context.DrawLine(new Pen(brush, width) { LineCap = PenLineCap.Round }, start, end);
     }
 
     /// <summary>
