@@ -82,36 +82,30 @@ public partial class MainWindow : Window
 
         if (DataContext is not ClockViewModel vm) return;
 
-        // ── Swipe up → bus animation ──
-        if (dy > 80 && absDy > absDx * 1.5 && ms < 800
-            && _phase == Phase.None && !vm.IsAnimationPlaying)
+        // ── Tap → toggle bus animation (kid-friendly mode) ──
+        if (absDx < 30 && absDy < 30 && _phase == Phase.None)
         {
-            BeginBusEnter();
+            if (vm.IsAnimationPlaying)
+                BeginBusExit();
+            else
+                BeginBusEnter();
             return;
         }
 
-        // ── Swipe down → dismiss bus animation ──
-        if (dy < -80 && absDy > absDx * 1.5 && ms < 800
-            && vm.IsAnimationPlaying && _phase == Phase.None)
-        {
-            BeginBusExit();
-            return;
-        }
-
-        // ── Swipe left / right → cycle clock mode ──
-        if (absDx > 80 && absDx > absDy * 1.5 && ms < 800
-            && _phase == Phase.None && !vm.IsAnimationPlaying)
-        {
-            BeginModeSlide(dx < 0 ? -1 : 1);
-            return;
-        }
-
-        // ── Tap → dismiss bus animation ──
-        if (absDx < 30 && absDy < 30
-            && vm.IsAnimationPlaying && _phase == Phase.None)
-        {
-            BeginBusExit();
-        }
+        // Swipe gestures disabled for now (toddler mode 😄)
+        // Uncomment to restore: swipe up/down = bus, left/right = cycle clock mode
+        //
+        // if (dy > 80 && absDy > absDx * 1.5 && ms < 800
+        //     && _phase == Phase.None && !vm.IsAnimationPlaying)
+        // { BeginBusEnter(); return; }
+        //
+        // if (dy < -80 && absDy > absDx * 1.5 && ms < 800
+        //     && vm.IsAnimationPlaying && _phase == Phase.None)
+        // { BeginBusExit(); return; }
+        //
+        // if (absDx > 80 && absDx > absDy * 1.5 && ms < 800
+        //     && _phase == Phase.None && !vm.IsAnimationPlaying)
+        // { BeginModeSlide(dx < 0 ? -1 : 1); return; }
     }
 
     // ════════════════════════════════════════════════════
