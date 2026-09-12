@@ -9,6 +9,11 @@ publish/
 *.user
 *.suo
 
+## Audio assets (copyrighted — not for public repo)
+assets/*.mp3
+assets/*.wav
+assets/*.ogg
+
 ## OS
 Thumbs.db
 .DS_Store
