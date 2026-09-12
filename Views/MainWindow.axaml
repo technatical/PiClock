@@ -12,6 +12,7 @@
         <vm:ClockViewModel/>
     </Design.DataContext>
 
+    <Panel>
     <Panel Opacity="{Binding DisplayOpacity}">
     <Grid Margin="30,30">
         <Grid.RenderTransform>
@@ -144,5 +145,10 @@
 
     <!-- 🐭 Scurrying mouse overlay -->
     <controls:RunningMouse IsHitTestVisible="False"/>
+    </Panel>
+
+    <!-- 🚌 Wheels on the Bus animation (swipe up to play, tap to dismiss) -->
+    <controls:WheelsOnTheBus IsPlaying="{Binding IsAnimationPlaying}"
+                              IsHitTestVisible="False"/>
     </Panel>
 </Window>
