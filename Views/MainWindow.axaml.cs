@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -28,6 +29,12 @@ public partial class MainWindow : Window
     private const double OutMs     = 180;   // snappy slide-out
     private const double InMs      = 250;   // smooth slide-in
     private const double BusMs     = 400;   // bus enter/exit
+
+    // ── Audio playback (Bluetooth → Echo Studio) ──
+    private const string AudioFile = "assets/wheels-on-the-bus.mp3";
+    private const string EchoMac   = "B8:5F:98:E4:FD:B1";
+    private double _songDuration   = 39;   // overridden by ffprobe at runtime
+    private Process? _audioProcess;
 
     public MainWindow()
     {
@@ -83,6 +90,14 @@ public partial class MainWindow : Window
             return;
         }
 
+        // ── Swipe down → dismiss bus animation ──
+        if (dy < -80 && absDy > absDx * 1.5 && ms < 800
+            && vm.IsAnimationPlaying && _phase == Phase.None)
+        {
+            BeginBusExit();
+            return;
+        }
+
         // ── Swipe left / right → cycle clock mode ──
         if (absDx > 80 && absDx > absDy * 1.5 && ms < 800
             && _phase == Phase.None && !vm.IsAnimationPlaying)
@@ -117,9 +132,17 @@ public partial class MainWindow : Window
 
     private void BeginBusEnter()
     {
+        var audioPath = Path.Combine(AppContext.BaseDirectory, AudioFile);
+        _songDuration = ProbeAudioDuration(audioPath);
+
+        // Tell the bus control how long the song is — it adapts all timing
+        var busOverlay = this.FindControl<Controls.WheelsOnTheBus>("BusOverlay");
+        if (busOverlay != null) busOverlay.SongDuration = _songDuration;
+
         if (DataContext is ClockViewModel vm)
             vm.StartBusAnimation();
 
+        StartAudio(audioPath);
         _busSlide.Y = Bounds.Height;
         _progress = 0;
         _phase = Phase.BusEnter;
@@ -130,6 +153,7 @@ public partial class MainWindow : Window
     {
         _autoDismissTimer?.Stop();
         _autoDismissTimer = null;
+        StopAudio();
         _progress = 0;
         _phase = Phase.BusExit;
         StartTimer();
@@ -214,10 +238,10 @@ public partial class MainWindow : Window
                     _busSlide.Y = 0;
                     StopTimer();
 
-                    // Auto-dismiss after the bus drives across (~10 s)
+                    // Auto-dismiss when the song ends
                     _autoDismissTimer = new DispatcherTimer
                     {
-                        Interval = TimeSpan.FromSeconds(10)
+                        Interval = TimeSpan.FromSeconds(_songDuration)
                     };
                     _autoDismissTimer.Tick += (_, _) => BeginBusExit();
                     _autoDismissTimer.Start();
@@ -246,6 +270,68 @@ public partial class MainWindow : Window
                 break;
             }
         }
+    }
+
+    // ════════════════════════════════════════════════════
+    //  Audio playback (mpv → Bluetooth Echo Studio)
+    // ════════════════════════════════════════════════════
+
+    /// <summary>Probe audio duration via ffprobe. Falls back to 39s.</summary>
+    private static double ProbeAudioDuration(string path)
+    {
+        if (!File.Exists(path)) return 39;
+        try
+        {
+            var proc = Process.Start(new ProcessStartInfo("ffprobe",
+                $"-v quiet -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 \"{path}\"")
+            {
+                UseShellExecute = false, CreateNoWindow = true,
+                RedirectStandardOutput = true
+            });
+            if (proc == null) return 39;
+            string output = proc.StandardOutput.ReadToEnd();
+            proc.WaitForExit(5000);
+            return double.TryParse(output.Trim(),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out double dur) ? dur : 39;
+        }
+        catch { return 39; }
+    }
+
+    private void StartAudio(string audioPath)
+    {
+        try
+        {
+            // Reconnect Bluetooth if idle-disconnected (instant if already connected)
+            Process.Start(new ProcessStartInfo("bluetoothctl", $"connect {EchoMac}")
+            {
+                UseShellExecute = false, CreateNoWindow = true
+            });
+
+            if (!File.Exists(audioPath)) return;
+
+            _audioProcess = Process.Start(new ProcessStartInfo("mpv",
+                $"--no-video --no-terminal \"{audioPath}\"")
+            {
+                UseShellExecute = false, CreateNoWindow = true
+            });
+        }
+        catch { /* Audio is best-effort — don't crash the clock */ }
+    }
+
+    private void StopAudio()
+    {
+        try
+        {
+            if (_audioProcess is { HasExited: false })
+            {
+                _audioProcess.Kill();
+                _audioProcess.Dispose();
+            }
+            _audioProcess = null;
+        }
+        catch { }
     }
 
     /// <summary>Ease-out cubic — fast start, smooth deceleration.</summary>
@@ -290,7 +376,20 @@ public partial class MainWindow : Window
                 }
                 break;
 
-            // Arrow keys = cycle clock mode
+            // Up / Down arrows = bus animation (matches swipe gestures)
+            case Key.Up:
+                if (_phase == Phase.None && DataContext is ClockViewModel uvm
+                    && !uvm.IsAnimationPlaying)
+                    BeginBusEnter();
+                break;
+
+            case Key.Down:
+                if (_phase == Phase.None && DataContext is ClockViewModel dvm
+                    && dvm.IsAnimationPlaying)
+                    BeginBusExit();
+                break;
+
+            // Left / Right arrows = cycle clock mode
             case Key.Left:
                 if (_phase == Phase.None && DataContext is ClockViewModel lvm
                     && !lvm.IsAnimationPlaying)

@@ -22,11 +22,26 @@ public class WheelsOnTheBus : Control
         set => SetValue(IsPlayingProperty, value);
     }
 
+    public static readonly StyledProperty<double> SongDurationProperty =
+        AvaloniaProperty.Register<WheelsOnTheBus, double>(nameof(SongDuration), 39);
+
+    /// <summary>Song length in seconds — animation timing adapts automatically.</summary>
+    public double SongDuration
+    {
+        get => GetValue(SongDurationProperty);
+        set => SetValue(SongDurationProperty, value);
+    }
+
     private readonly DispatcherTimer _timer;
     private int _tick;
 
     private const double TickMs = 20;       // ~50 fps
-    private const int TotalTicks = 500;     // 10 seconds
+
+    // ── Timing computed from song duration ──
+    private int TotalTicks    => (int)(SongDuration * 1000 / TickMs);
+    private int EnterTicks    => Math.Min(100, TotalTicks / 10);            // ~2s or 10%
+    private int ExitStartTick => Math.Max(EnterTicks + 50, TotalTicks - 250); // last ~5s
+    private int TicksPerVerse => Math.Max(1, TotalTicks / 4);               // 4 verses
 
     // ── Verse lyrics (each ~2.5 s = 125 ticks) ──
     private static readonly string[] Lyrics =
@@ -37,7 +52,7 @@ public class WheelsOnTheBus : Control
         "The people on the bus go up and down!"
     ];
 
-    private int VerseIndex => Math.Clamp(_tick / 125, 0, 3);
+    private int VerseIndex => Math.Clamp(_tick / TicksPerVerse, 0, 3);
 
     // ── Static brushes (allocated once) ──
     private static readonly IBrush SkyFill      = new SolidColorBrush(Color.Parse("#4A90D9"));
@@ -105,10 +120,30 @@ public class WheelsOnTheBus : Control
         double w = sz.Width, h = sz.Height;
         double s = Math.Min(w / 1280.0, h / 800.0);    // uniform scale
 
-        // Bus travel: off-screen left → off-screen right over TotalTicks
+        // Bus dimensions and travel
         double bw = 480 * s;
         double margin = 100 * s;
-        double busX = -bw - margin + (w + bw + 2 * margin) * _tick / (double)TotalTicks;
+        double centerX = (w - bw) / 2;
+
+        // 3-phase travel: enter → park in center → drive off
+        double busX;
+        if (_tick <= EnterTicks)
+        {
+            // Drive from off-screen left to center (ease-out: decelerate to stop)
+            double t = EaseOut((double)_tick / EnterTicks);
+            busX = (-bw - margin) + t * (centerX + bw + margin);
+        }
+        else if (_tick <= ExitStartTick)
+        {
+            // Parked in center — the show!
+            busX = centerX;
+        }
+        else
+        {
+            // Drive off to the right (ease-in: accelerate away)
+            double t = EaseIn((double)(_tick - ExitStartTick) / (TotalTicks - ExitStartTick));
+            busX = centerX + t * (w + margin - centerX);
+        }
 
         // Scene regions
         double roadTop  = h * 0.62;
@@ -359,6 +394,17 @@ public class WheelsOnTheBus : Control
 
         // Main text
         ctx.DrawText(fmt, new Point(tx, ty));
+    }
+
+    /// <summary>Ease-out cubic — fast start, smooth deceleration.</summary>
+    private static double EaseOut(double t) =>
+        1 - Math.Pow(1 - Math.Clamp(t, 0, 1), 3);
+
+    /// <summary>Ease-in cubic — slow start, accelerating.</summary>
+    private static double EaseIn(double t)
+    {
+        t = Math.Clamp(t, 0, 1);
+        return t * t * t;
     }
 
     /// <summary>Wraps val into the range [min, max).</summary>
