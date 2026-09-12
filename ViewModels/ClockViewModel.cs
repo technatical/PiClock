@@ -34,7 +34,6 @@ public class ClockViewModel : ViewModelBase
     private double _shiftY;
     private double _displayOpacity = 1.0;
     private bool _isAnimationPlaying;
-    private DispatcherTimer? _animationTimer;
 
     // ── Display mode: Analog → Digital → Calendar ──
     public int DisplayMode
@@ -97,25 +96,19 @@ public class ClockViewModel : ViewModelBase
     public bool IsAnimationPlaying { get => _isAnimationPlaying; set => SetProperty(ref _isAnimationPlaying, value); }
 
     public void ToggleMode() => DisplayMode = (DisplayMode + 1) % 3;
+    public void NextMode()     => DisplayMode = (DisplayMode + 1) % 3;
+    public void PreviousMode() => DisplayMode = (DisplayMode + 2) % 3;
 
     public void StartBusAnimation()
     {
-        _animationTimer?.Stop();
-
         // Toggle false→true to reset the control's tick counter on replay
         if (_isAnimationPlaying)
             IsAnimationPlaying = false;
-
         IsAnimationPlaying = true;
-        _animationTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
-        _animationTimer.Tick += (_, _) => StopBusAnimation();
-        _animationTimer.Start();
     }
 
     public void StopBusAnimation()
     {
-        _animationTimer?.Stop();
-        _animationTimer = null;
         IsAnimationPlaying = false;
     }
 

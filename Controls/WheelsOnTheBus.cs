@@ -97,7 +97,7 @@ public class WheelsOnTheBus : Control
 
     public override void Render(DrawingContext context)
     {
-        if (!IsPlaying || _tick > TotalTicks + 10) return;
+        if (!IsPlaying) return;
 
         var sz = Bounds.Size;
         if (sz.Width <= 0 || sz.Height <= 0) return;
