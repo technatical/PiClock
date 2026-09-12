@@ -311,11 +311,14 @@ public partial class MainWindow : Window
 
             if (!File.Exists(audioPath)) return;
 
-            _audioProcess = Process.Start(new ProcessStartInfo("mpv",
+            var psi = new ProcessStartInfo("mpv",
                 $"--no-video --no-terminal \"{audioPath}\"")
             {
                 UseShellExecute = false, CreateNoWindow = true
-            });
+            };
+            // System service doesn't inherit user session — tell mpv where PipeWire lives
+            psi.Environment["XDG_RUNTIME_DIR"] = "/run/user/1000";
+            _audioProcess = Process.Start(psi);
         }
         catch { /* Audio is best-effort — don't crash the clock */ }
     }
