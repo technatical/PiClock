@@ -40,7 +40,7 @@ public class WheelsOnTheBus : Control
     // ── Timing computed from song duration ──
     private int TotalTicks    => (int)(SongDuration * 1000 / TickMs);
     private int EnterTicks    => Math.Min(100, TotalTicks / 10);            // ~2s or 10%
-    private int ExitStartTick => Math.Max(EnterTicks + 50, TotalTicks - 250); // last ~5s
+    private int ExitStartTick => Math.Max(EnterTicks + 50, TotalTicks - 400); // last ~8s
     private int TicksPerVerse => Math.Max(1, TotalTicks / 4);               // 4 verses
 
     // ── Verse lyrics (each ~2.5 s = 125 ticks) ──
@@ -400,11 +400,11 @@ public class WheelsOnTheBus : Control
     private static double EaseOut(double t) =>
         1 - Math.Pow(1 - Math.Clamp(t, 0, 1), 3);
 
-    /// <summary>Ease-in cubic — slow start, accelerating.</summary>
+    /// <summary>Ease-in quadratic — gentle start, accelerating away.</summary>
     private static double EaseIn(double t)
     {
         t = Math.Clamp(t, 0, 1);
-        return t * t * t;
+        return t * t;
     }
 
     /// <summary>Wraps val into the range [min, max).</summary>
