@@ -305,12 +305,15 @@ public partial class MainWindow : Window
 
             if (!File.Exists(audioPath)) return;
 
-            var psi = new ProcessStartInfo("mpv",
-                $"--no-video --no-terminal \"{audioPath}\"")
+            // Use wrapper script to guarantee PipeWire environment from systemd service
+            var scriptPath = Path.Combine(AppContext.BaseDirectory, "play-audio.sh");
+            var cmd = File.Exists(scriptPath) ? scriptPath : "mpv";
+            var args = File.Exists(scriptPath) ? $"\"{audioPath}\"" : $"--no-video --no-terminal \"{audioPath}\"";
+
+            var psi = new ProcessStartInfo(cmd, args)
             {
                 UseShellExecute = false, CreateNoWindow = true
             };
-            // System service doesn't inherit user session — tell mpv where PipeWire lives
             psi.Environment["XDG_RUNTIME_DIR"] = "/run/user/1000";
             _audioProcess = Process.Start(psi);
         }
