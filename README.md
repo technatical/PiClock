@@ -143,6 +143,22 @@ bluetoothctl connect B8:5F:98:E4:FD:B1
 
 Check it: `wpctl status` should list **Echo Studio** under Sinks (not "Dummy Output"), and `pactl list cards | grep "Active Profile"` should show `a2dp-sink` for the Bluetooth card.
 
+**Keep the stream open between plays.** By default PipeWire releases the Bluetooth audio stream a few seconds after a song ends, and the Echo announces "Playing from PiClock" every time the next song re-opens it. Disabling suspend on the Echo sink keeps the (silent) stream open, so the Echo stays quiet:
+
+```bash
+cat > ~/.config/wireplumber/wireplumber.conf.d/51-bluez-no-suspend.conf << 'EOF'
+monitor.bluez.rules = [
+  {
+    matches = [ { node.name = "~bluez_output.*" } ]
+    actions = { update-props = { session.suspend-timeout-seconds = 0 } }
+  }
+]
+EOF
+systemctl --user restart wireplumber
+```
+
+If Alexa ever complains that Bluetooth is in use, delete that file and restart WirePlumber to go back to the default.
+
 Copy the MP3s into the app folder. They are not in the repo (copyrighted) and `deploy.ps1` never touches them, so keep a copy somewhere safe:
 
 ```bash
@@ -237,6 +253,7 @@ PiClock/
 On the Pi only (not in the repo):
 ~/PiClock/assets/*.mp3
 ~/.config/wireplumber/wireplumber.conf.d/50-bluez-roles.conf
+~/.config/wireplumber/wireplumber.conf.d/51-bluez-no-suspend.conf
 ```
 
 ## Hardware
