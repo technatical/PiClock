@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 namespace PiClock.Audio;
 
 /// <summary>One playable song: absolute path plus per-song start offset and fade-in (seconds).</summary>
-public sealed record Song(string Path, double Start, double FadeIn);
+public sealed record Song(string Path, double Start, double FadeIn, double Gain = 0);
 
 /// <summary>Play-limit settings from songs.json ("limit" section).</summary>
 public sealed class LimitConfig
@@ -17,6 +17,8 @@ public sealed class LimitConfig
     public double CooldownMinutes { get; set; } = 10;
     /// <summary>Clip played when the bus is tapped during a nap (file name in assets).</summary>
     public string? ComeBackLater { get; set; } = "come-back-soon.mp3";
+    /// <summary>Gain in dB applied to that clip (positive = louder).</summary>
+    public double ComeBackLaterGain { get; set; }
     /// <summary>Minimum seconds between plays of that clip, so tap-spamming doesn't stutter it.</summary>
     public double ClipEverySeconds { get; set; } = 20;
     /// <summary>A tap only counts after this many quiet seconds since the previous tap,
@@ -35,6 +37,8 @@ public sealed class SongLibrary
         public string File { get; set; } = "";
         public double Start { get; set; }
         public double FadeIn { get; set; }
+        /// <summary>Gain in dB (positive = louder). Peaks are not limited, so keep it modest.</summary>
+        public double Gain { get; set; }
     }
 
     private sealed class LibraryFile
@@ -91,7 +95,7 @@ public sealed class SongLibrary
                 Console.Error.WriteLine($"songs.json: song not found, skipping: {path}");
                 continue;
             }
-            _songs.Add(new Song(path, Math.Max(0, e.Start), Math.Max(0, e.FadeIn)));
+            _songs.Add(new Song(path, Math.Max(0, e.Start), Math.Max(0, e.FadeIn), e.Gain));
         }
 
         // No list (or nothing usable in it): every MP3 in the folder is a song

@@ -167,17 +167,26 @@ Before each play the app runs `bluetoothctl connect` so an idle-disconnected Ech
   "songs": [
     // start  = seconds to skip; fadeIn = seconds to ramp up from silence at that point
     { "file": "wheels-on-the-bus.mp3", "start": 6.5, "fadeIn": 1.5 },
-    { "file": "old-macdonald.mp3" }
+    { "file": "old-macdonald.mp3", "gain": -3 }   // gain = dB, optional
   ],
   "limit": {
     "plays": 3,               // this many plays...
     "spanMinutes": 5,         // ...all starting within this window...
     "cooldownMinutes": 10,    // ...and the bus naps for this long
     "comeBackLater": "come-back-soon.mp3",
+    "comeBackLaterGain": 0,   // dB adjustment for the clip
     "clipEverySeconds": 20,   // don't replay the clip faster than this
     "tapDebounceSeconds": 2   // a tap counts only after this many quiet seconds
   }
 }
+```
+
+`gain` is applied by mpv with no peak limiting, so it is for small corrections. A clip that is far too quiet (a text-to-speech export, say) is better normalized once with ffmpeg, keeping the original:
+
+```bash
+cd ~/PiClock/assets
+cp come-back-soon.mp3 come-back-soon.orig.mp3
+ffmpeg -y -i come-back-soon.orig.mp3 -af "loudnorm=I=-12:TP=-1.0:LRA=7" -ar 44100 -b:a 128k come-back-soon.mp3
 ```
 
 Taps are debounced: every tap resets a timer and only a tap that follows `tapDebounceSeconds` of quiet is acted on. A flurry of taps starts the bus once and cannot dismiss it.

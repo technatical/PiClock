@@ -2,6 +2,7 @@
   // Songs live in this folder on the Pi (MP3s are not in the repo).
   // start  = seconds to skip at the beginning
   // fadeIn = seconds to ramp the volume up from silence, starting at "start"
+  // gain   = dB adjustment (optional; positive = louder, no peak limiting, keep it small)
   "songs": [
     { "file": "wheels-on-the-bus.mp3", "start": 6.5, "fadeIn": 1.5 }
   ],
@@ -13,6 +14,7 @@
     "spanMinutes": 5,
     "cooldownMinutes": 1.5,
     "comeBackLater": "come-back-soon.mp3",
+    "comeBackLaterGain": 1,
     "clipEverySeconds": 20,
 
     // A tap only counts after this many quiet seconds since the previous tap

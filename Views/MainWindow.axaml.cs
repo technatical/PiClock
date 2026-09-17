@@ -326,11 +326,8 @@ public partial class MainWindow : Window
         {
             StopAudio();
 
-            // Reconnect Bluetooth if idle-disconnected (instant if already connected)
-            Process.Start(new ProcessStartInfo("bluetoothctl", $"connect {EchoMac}")
-            {
-                UseShellExecute = false, CreateNoWindow = true
-            });
+            // Reconnect Bluetooth if idle-disconnected, off the UI thread
+            Task.Run(EnsureBluetoothConnected);
 
             if (!File.Exists(song.Path)) return;
 
@@ -358,14 +355,42 @@ public partial class MainWindow : Window
 
             // afade runs on the file's own clock, so the fade must start at the offset,
             // not at zero, or it is already finished by the time playback begins.
+            var filters = new List<string>();
             if (song.FadeIn > 0)
-                psi.ArgumentList.Add(
-                    $"--af=lavfi=[afade=t=in:st={startArg}:d={song.FadeIn.ToString("0.###", inv)}]");
+                filters.Add($"afade=t=in:st={startArg}:d={song.FadeIn.ToString("0.###", inv)}");
+            if (Math.Abs(song.Gain) > 0.01)
+                filters.Add($"volume={song.Gain.ToString("0.#", inv)}dB");
+            if (filters.Count > 0)
+                psi.ArgumentList.Add($"--af=lavfi=[{string.Join(",", filters)}]");
 
             psi.ArgumentList.Add(song.Path);
             _audioProcess = Process.Start(psi);
         }
         catch { /* Audio is best-effort — don't crash the clock */ }
+    }
+
+    /// <summary>Connects the Echo only if bluetoothctl says it is not already connected,
+    /// so the journal stays free of "already connected" complaints on every play.</summary>
+    private static void EnsureBluetoothConnected()
+    {
+        try
+        {
+            using var info = Process.Start(new ProcessStartInfo("bluetoothctl", $"info {EchoMac}")
+            {
+                UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true
+            });
+            if (info == null) return;
+            string status = info.StandardOutput.ReadToEnd();
+            info.WaitForExit(3000);
+            if (status.Contains("Connected: yes")) return;
+
+            using var connect = Process.Start(new ProcessStartInfo("bluetoothctl", $"connect {EchoMac}")
+            {
+                UseShellExecute = false, CreateNoWindow = true
+            });
+            connect?.WaitForExit(10000);
+        }
+        catch { /* best effort */ }
     }
 
     // ════════════════════════════════════════════════════
@@ -417,7 +442,7 @@ public partial class MainWindow : Window
         if (_library.ComeBackLaterPath is not { } clip) return;
 
         _lastClipAt = now;
-        StartAudio(new Song(clip, 0, 0));
+        StartAudio(new Song(clip, 0, 0, _library.Limit.ComeBackLaterGain));
     }
 
     private void StopAudio()
