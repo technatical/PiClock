@@ -42,6 +42,7 @@ public partial class MainWindow : Window
     // ── Nap (too many plays in a row) ──
     private DispatcherTimer? _napTimer;
     private DateTime _lastClipAt = DateTime.MinValue;
+    private DateTime _lastTapAt  = DateTime.MinValue;
 
     public MainWindow()
     {
@@ -93,8 +94,15 @@ public partial class MainWindow : Window
         if (DataContext is not ClockViewModel vm) return;
 
         // ── Tap → toggle bus animation (kid-friendly mode) ──
-        if (absDx < 30 && absDy < 30 && _phase == Phase.None)
+        if (absDx < 30 && absDy < 30)
         {
+            // Rolling debounce: every tap resets the clock, only a tap after a quiet
+            // spell is acted on. Mashing the screen can't cut the song short.
+            var now = DateTime.UtcNow;
+            bool tooSoon = (now - _lastTapAt).TotalSeconds < _library.Limit.TapDebounceSeconds;
+            _lastTapAt = now;
+            if (tooSoon || _phase != Phase.None) return;
+
             if (vm.IsAnimationPlaying)
                 BeginBusExit();
             else if (_limiter.IsLocked(DateTime.Now))

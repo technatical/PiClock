@@ -174,10 +174,13 @@ Before each play the app runs `bluetoothctl connect` so an idle-disconnected Ech
     "spanMinutes": 5,         // ...all starting within this window...
     "cooldownMinutes": 10,    // ...and the bus naps for this long
     "comeBackLater": "come-back-soon.mp3",
-    "clipEverySeconds": 20    // don't replay the clip faster than this
+    "clipEverySeconds": 20,   // don't replay the clip faster than this
+    "tapDebounceSeconds": 2   // a tap counts only after this many quiet seconds
   }
 }
 ```
+
+Taps are debounced: every tap resets a timer and only a tap that follows `tapDebounceSeconds` of quiet is acted on. A flurry of taps starts the bus once and cannot dismiss it.
 
 Each tap picks a random song (never the same one twice in a row) and the bus animation adapts to that song's length minus its offset. Songs listed but missing on the Pi are skipped with a note on stderr (`journalctl -u piclock`). If the file is absent, every MP3 in `assets/` is a song with no offset. The fade is done by mpv's `afade` filter; note that it runs on the file's own clock, so the app starts the fade at the offset rather than at zero.
 

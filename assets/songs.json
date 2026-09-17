@@ -13,6 +13,9 @@
     "spanMinutes": 5,
     "cooldownMinutes": 1.5,
     "comeBackLater": "come-back-soon.mp3",
-    "clipEverySeconds": 20
+    "clipEverySeconds": 20,
+
+    // A tap only counts after this many quiet seconds since the previous tap
+    "tapDebounceSeconds": 2
   }
 }

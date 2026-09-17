@@ -19,6 +19,9 @@ public sealed class LimitConfig
     public string? ComeBackLater { get; set; } = "come-back-soon.mp3";
     /// <summary>Minimum seconds between plays of that clip, so tap-spamming doesn't stutter it.</summary>
     public double ClipEverySeconds { get; set; } = 20;
+    /// <summary>A tap only counts after this many quiet seconds since the previous tap,
+    /// so a flurry of taps starts the bus once instead of starting and dismissing it.</summary>
+    public double TapDebounceSeconds { get; set; } = 2;
 }
 
 /// <summary>
