@@ -10,7 +10,7 @@ Three display modes (the default is the calendar):
 
 **Toddler mode:** tapping the screen drives a bus in from the bottom and plays a song (*Wheels on the Bus*, or a random pick from a library) through a Bluetooth speaker (an Echo Studio). The bus parks for the length of the song and drives off near the end. Tap again to send it away early. Swipe gestures (cycle modes, dismiss the bus) exist in the code but are commented out so small hands can't get lost.
 
-**Nap time:** three plays that all start within 5 minutes put the bus to sleep for 10 minutes. A sleeping bus with a shrinking bar appears along the bottom (small digits in the corner for grown-ups), and tapping during the nap plays a short "come back soon" clip instead of the song. All of it is set in `assets/songs.json`.
+**Nap time:** three plays that all start within 5 minutes put the bus to sleep for 90 seconds (both numbers are settings). A sleeping bus with a shrinking bar appears along the bottom (small digits in the corner for grown-ups), and tapping during the nap plays a short "come back soon" clip instead of the song. All of it is set in `assets/songs.json`.
 
 A little gray mouse with pink ears scurries across the bottom of the screen every few minutes. Sometimes it crosses all the way, sometimes it stops to look around, and sometimes it hesitates and runs back the way it came.
 

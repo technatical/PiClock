@@ -6,12 +6,12 @@
     { "file": "wheels-on-the-bus.mp3", "start": 6.5, "fadeIn": 1.5 }
   ],
 
-  // Three plays that all start within 5 minutes => the bus naps for 10 minutes.
+  // Three plays that all start within 5 minutes => the bus naps for 90 seconds.
   // Tapping during the nap plays the clip (at most once every 20 seconds).
   "limit": {
     "plays": 3,
     "spanMinutes": 5,
-    "cooldownMinutes": 10,
+    "cooldownMinutes": 1.5,
     "comeBackLater": "come-back-soon.mp3",
     "clipEverySeconds": 20
   }
