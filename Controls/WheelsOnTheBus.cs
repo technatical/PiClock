@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
@@ -9,7 +10,7 @@ namespace PiClock.Controls;
 /// A colorful "Wheels on the Bus" animation — triggered by swipe-up.
 /// A bright school bus drives across with spinning wheels, swishing wipers,
 /// an opening door, and bouncing passengers. Song lyrics scroll at the top.
-/// Plays for ~10 seconds, then the clock resumes.  Tap to dismiss early.
+/// Runs for the length of the song, then the clock resumes.  Tap to dismiss early.
 /// </summary>
 public class WheelsOnTheBus : Control
 {
@@ -33,15 +34,22 @@ public class WheelsOnTheBus : Control
     }
 
     private readonly DispatcherTimer _timer;
+    private readonly Stopwatch _clock = new();
     private int _tick;
 
-    private const double TickMs = 20;       // ~50 fps
+    private const double TickMs = 20;       // animation time unit (~50 fps when the Pi keeps up)
 
     // ── Timing computed from song duration ──
+    // _tick is derived from the wall clock, not counted, so the bus stays in step with the
+    // song even when the Pi cannot draw 50 frames a second.
     private int TotalTicks    => (int)(SongDuration * 1000 / TickMs);
     private int EnterTicks    => Math.Min(100, TotalTicks / 10);            // ~2s or 10%
-    private int ExitStartTick => Math.Max(EnterTicks + 50, TotalTicks - 400); // last ~8s
+    private int ExitTicks     => Math.Min(500, TotalTicks / 3);             // last ~10s
+    private int ExitStartTick => Math.Max(EnterTicks + 50, TotalTicks - ExitTicks);
     private int TicksPerVerse => Math.Max(1, TotalTicks / 4);               // 4 verses
+
+    /// <summary>How much of the bus is still on screen when the song ends (back bumper only).</summary>
+    private const double VisibleAtEnd = 0.10;
 
     // ── Verse lyrics (each ~2.5 s = 125 ticks) ──
     private static readonly string[] Lyrics =
@@ -88,11 +96,13 @@ public class WheelsOnTheBus : Control
             if ((bool)args.NewValue!)
             {
                 ctrl._tick = 0;
+                ctrl._clock.Restart();
                 ctrl._timer.Start();
             }
             else
             {
                 ctrl._timer.Stop();
+                ctrl._clock.Stop();
             }
 
             ctrl.InvalidateVisual();
@@ -103,7 +113,7 @@ public class WheelsOnTheBus : Control
     {
         IsHitTestVisible = false;
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TickMs) };
-        _timer.Tick += (_, _) => { _tick++; InvalidateVisual(); };
+        _timer.Tick += (_, _) => { _tick = (int)(_clock.ElapsedMilliseconds / TickMs); InvalidateVisual(); };
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -140,9 +150,11 @@ public class WheelsOnTheBus : Control
         }
         else
         {
-            // Drive off to the right (ease-in: accelerate away)
+            // Drive off to the right (ease-in: accelerate away). Timed so that when the song
+            // ends only the back bumper is still visible; past the end it keeps going.
             double t = EaseIn((double)(_tick - ExitStartTick) / (TotalTicks - ExitStartTick));
-            busX = centerX + t * (w + margin - centerX);
+            double endX = w - bw * VisibleAtEnd;
+            busX = centerX + t * (endX - centerX);
         }
 
         // Scene regions
@@ -400,10 +412,11 @@ public class WheelsOnTheBus : Control
     private static double EaseOut(double t) =>
         1 - Math.Pow(1 - Math.Clamp(t, 0, 1), 3);
 
-    /// <summary>Ease-in quadratic — gentle start, accelerating away.</summary>
+    /// <summary>Ease-in quadratic — gentle start, accelerating away. Not capped at 1 so the
+    /// bus keeps driving if the scene is still up after the song.</summary>
     private static double EaseIn(double t)
     {
-        t = Math.Clamp(t, 0, 1);
+        t = Math.Max(0, t);
         return t * t;
     }
 
