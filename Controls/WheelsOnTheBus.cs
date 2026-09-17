@@ -44,7 +44,7 @@ public class WheelsOnTheBus : Control
     // song even when the Pi cannot draw 50 frames a second.
     private int TotalTicks    => (int)(SongDuration * 1000 / TickMs);
     private int EnterTicks    => Math.Min(100, TotalTicks / 10);            // ~2s or 10%
-    private int ExitTicks     => Math.Min(500, TotalTicks / 3);             // last ~10s
+    private int ExitTicks     => Math.Min(600, TotalTicks / 3);             // last ~12s
     private int ExitStartTick => Math.Max(EnterTicks + 50, TotalTicks - ExitTicks);
     private int TicksPerVerse => Math.Max(1, TotalTicks / 4);               // 4 verses
 

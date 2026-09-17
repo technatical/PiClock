@@ -2,9 +2,11 @@
   // Songs live in this folder on the Pi (MP3s are not in the repo).
   // start  = seconds to skip at the beginning
   // fadeIn = seconds to ramp the volume up from silence, starting at "start"
+  // end    = seconds (from the start of the file) to stop at; trims a silent tail (optional)
+  // fadeOut= seconds of fade-out ending at "end" (optional)
   // gain   = dB adjustment (optional; positive = louder, no peak limiting, keep it small)
   "songs": [
-    { "file": "wheels-on-the-bus.mp3", "start": 6.5, "fadeIn": 1.5 }
+    { "file": "wheels-on-the-bus.mp3", "start": 6.5, "fadeIn": 1.5, "end": 86, "fadeOut": 1 }
   ],
 
   // Three plays that all start within 5 minutes => the bus naps for 90 seconds.

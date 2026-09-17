@@ -3,8 +3,10 @@ using System.Text.Json.Serialization;
 
 namespace PiClock.Audio;
 
-/// <summary>One playable song: absolute path plus per-song start offset and fade-in (seconds).</summary>
-public sealed record Song(string Path, double Start, double FadeIn, double Gain = 0);
+/// <summary>One playable song: absolute path plus per-song trim and fade settings (seconds).
+/// End = 0 means play to the end of the file.</summary>
+public sealed record Song(string Path, double Start, double FadeIn, double Gain = 0,
+                          double End = 0, double FadeOut = 0);
 
 /// <summary>Play-limit settings from songs.json ("limit" section).</summary>
 public sealed class LimitConfig
@@ -39,6 +41,11 @@ public sealed class SongLibrary
         public double FadeIn { get; set; }
         /// <summary>Gain in dB (positive = louder). Peaks are not limited, so keep it modest.</summary>
         public double Gain { get; set; }
+        /// <summary>Seconds (from the start of the file) to stop at; 0 = end of file.
+        /// Use it to trim a silent or fading tail so the bus and the music end together.</summary>
+        public double End { get; set; }
+        /// <summary>Seconds of fade-out ending at End.</summary>
+        public double FadeOut { get; set; }
     }
 
     private sealed class LibraryFile
@@ -95,7 +102,9 @@ public sealed class SongLibrary
                 Console.Error.WriteLine($"songs.json: song not found, skipping: {path}");
                 continue;
             }
-            _songs.Add(new Song(path, Math.Max(0, e.Start), Math.Max(0, e.FadeIn), e.Gain));
+            double end = e.End > e.Start ? e.End : 0;
+            _songs.Add(new Song(path, Math.Max(0, e.Start), Math.Max(0, e.FadeIn), e.Gain,
+                                end, end > 0 ? Math.Max(0, e.FadeOut) : 0));
         }
 
         // No list (or nothing usable in it): every MP3 in the folder is a song

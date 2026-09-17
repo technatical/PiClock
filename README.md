@@ -181,8 +181,9 @@ Before each play the app runs `bluetoothctl connect` so an idle-disconnected Ech
 ```jsonc
 {
   "songs": [
-    // start  = seconds to skip; fadeIn = seconds to ramp up from silence at that point
-    { "file": "wheels-on-the-bus.mp3", "start": 6.5, "fadeIn": 1.5 },
+    // start/end = seconds into the file to play from/to (end trims a silent tail)
+    // fadeIn/fadeOut = seconds of ramp at each end
+    { "file": "wheels-on-the-bus.mp3", "start": 6.5, "fadeIn": 1.5, "end": 86, "fadeOut": 1 },
     { "file": "old-macdonald.mp3", "gain": -3 }   // gain = dB, optional
   ],
   "limit": {
@@ -207,7 +208,7 @@ ffmpeg -y -i come-back-soon.orig.mp3 -af "loudnorm=I=-12:TP=-1.0:LRA=7" -ar 4410
 
 Taps are debounced: every tap resets a timer and only a tap that follows `tapDebounceSeconds` of quiet is acted on. A flurry of taps starts the bus once and cannot dismiss it.
 
-Each tap picks a random song (never the same one twice in a row) and the bus animation adapts to that song's length minus its offset. Songs listed but missing on the Pi are skipped with a note on stderr (`journalctl -u piclock`). If the file is absent, every MP3 in `assets/` is a song with no offset. The fade is done by mpv's `afade` filter; note that it runs on the file's own clock, so the app starts the fade at the offset rather than at zero.
+Each tap picks a random song (never the same one twice in a row) and the bus animation adapts to the trimmed length (`end`, or the file length, minus `start`), so the bus's exit drive lands when the music actually stops. To find a silent tail: `ffmpeg -i song.mp3 -af silencedetect=n=-40dB:d=0.5 -f null -`. Songs listed but missing on the Pi are skipped with a note on stderr (`journalctl -u piclock`). If the file is absent, every MP3 in `assets/` is a song with no offset. The fade is done by mpv's `afade` filter; note that it runs on the file's own clock, so the app starts the fade at the offset rather than at zero.
 
 #### 8. Publish and copy (manual alternative to deploy.ps1)
 

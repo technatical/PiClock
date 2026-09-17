@@ -147,9 +147,14 @@ public partial class MainWindow : Window
     private void BeginBusEnter()
     {
         var song = _library.Pick();
-        _songDuration = song is null
-            ? 39
-            : Math.Max(5, ProbeAudioDuration(song.Path) - song.Start);
+        if (song is null)
+            _songDuration = 39;
+        else
+        {
+            double end = ProbeAudioDuration(song.Path);
+            if (song.End > 0) end = Math.Min(end, song.End);
+            _songDuration = Math.Max(5, end - song.Start);
+        }
 
         // Tell the bus control how long the song is — it adapts all timing
         var busOverlay = this.FindControl<Controls.WheelsOnTheBus>("BusOverlay");
@@ -352,12 +357,16 @@ public partial class MainWindow : Window
             string startArg = song.Start.ToString("0.###", inv);
             if (song.Start > 0)
                 psi.ArgumentList.Add($"--start={startArg}");
+            if (song.End > 0)
+                psi.ArgumentList.Add($"--end={song.End.ToString("0.###", inv)}");
 
             // afade runs on the file's own clock, so the fade must start at the offset,
             // not at zero, or it is already finished by the time playback begins.
             var filters = new List<string>();
             if (song.FadeIn > 0)
                 filters.Add($"afade=t=in:st={startArg}:d={song.FadeIn.ToString("0.###", inv)}");
+            if (song.End > 0 && song.FadeOut > 0)
+                filters.Add($"afade=t=out:st={(song.End - song.FadeOut).ToString("0.###", inv)}:d={song.FadeOut.ToString("0.###", inv)}");
             if (Math.Abs(song.Gain) > 0.01)
                 filters.Add($"volume={song.Gain.ToString("0.#", inv)}dB");
             if (filters.Count > 0)
