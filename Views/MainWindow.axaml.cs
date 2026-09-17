@@ -4,6 +4,8 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Threading;
+using PiClock.Audio;
+using PiClock.Controls;
 using PiClock.ViewModels;
 
 namespace PiClock.Views;
@@ -31,14 +33,22 @@ public partial class MainWindow : Window
     private const double BusMs     = 400;   // bus enter/exit
 
     // ── Audio playback (Bluetooth → Echo Studio) ──
-    private const string AudioFile = "assets/wheels-on-the-bus.mp3";
     private const string EchoMac   = "B8:5F:98:E4:FD:B1";
+    private readonly SongLibrary _library;
+    private readonly PlayLimiter _limiter;
     private double _songDuration   = 39;   // overridden by ffprobe at runtime
     private Process? _audioProcess;
+
+    // ── Nap (too many plays in a row) ──
+    private DispatcherTimer? _napTimer;
+    private DateTime _lastClipAt = DateTime.MinValue;
 
     public MainWindow()
     {
         InitializeComponent();
+
+        _library = new SongLibrary(Path.Combine(AppContext.BaseDirectory, "assets"));
+        _limiter = new PlayLimiter(_library.Limit);
 
         // Always hide the cursor — this is a clock, not a desktop app
         Cursor = new Cursor(StandardCursorType.None);
@@ -87,6 +97,8 @@ public partial class MainWindow : Window
         {
             if (vm.IsAnimationPlaying)
                 BeginBusExit();
+            else if (_limiter.IsLocked(DateTime.Now))
+                PlayComeBackLater();
             else
                 BeginBusEnter();
             return;
@@ -126,8 +138,10 @@ public partial class MainWindow : Window
 
     private void BeginBusEnter()
     {
-        var audioPath = Path.Combine(AppContext.BaseDirectory, AudioFile);
-        _songDuration = ProbeAudioDuration(audioPath);
+        var song = _library.Pick();
+        _songDuration = song is null
+            ? 39
+            : Math.Max(5, ProbeAudioDuration(song.Path) - song.Start);
 
         // Tell the bus control how long the song is — it adapts all timing
         var busOverlay = this.FindControl<Controls.WheelsOnTheBus>("BusOverlay");
@@ -136,7 +150,8 @@ public partial class MainWindow : Window
         if (DataContext is ClockViewModel vm)
             vm.StartBusAnimation();
 
-        StartAudio(audioPath);
+        if (song != null) StartAudio(song);
+        _limiter.RecordPlayStart(DateTime.Now);
         _busSlide.Y = Bounds.Height;
         _progress = 0;
         _phase = Phase.BusEnter;
@@ -260,6 +275,10 @@ public partial class MainWindow : Window
                         vm.StopBusAnimation();
 
                     StopTimer();
+
+                    // Third play in a short span? The bus takes a nap.
+                    if (_limiter.CheckAfterPlay(DateTime.Now))
+                        BeginNap();
                 }
                 break;
             }
@@ -293,31 +312,104 @@ public partial class MainWindow : Window
         catch { return 39; }
     }
 
-    private void StartAudio(string audioPath)
+    private void StartAudio(Song song)
     {
         try
         {
+            StopAudio();
+
             // Reconnect Bluetooth if idle-disconnected (instant if already connected)
             Process.Start(new ProcessStartInfo("bluetoothctl", $"connect {EchoMac}")
             {
                 UseShellExecute = false, CreateNoWindow = true
             });
 
-            if (!File.Exists(audioPath)) return;
+            if (!File.Exists(song.Path)) return;
 
-            // Use wrapper script to guarantee PipeWire environment from systemd service
+            // Use wrapper script to guarantee PipeWire environment from systemd service.
+            // The wrapper passes every argument through to mpv.
             var scriptPath = Path.Combine(AppContext.BaseDirectory, "play-audio.sh");
-            var cmd = File.Exists(scriptPath) ? scriptPath : "mpv";
-            var args = File.Exists(scriptPath) ? $"\"{audioPath}\"" : $"--no-video --no-terminal \"{audioPath}\"";
+            bool useScript = File.Exists(scriptPath) && !OperatingSystem.IsWindows();
 
-            var psi = new ProcessStartInfo(cmd, args)
+            var psi = new ProcessStartInfo(useScript ? scriptPath : "mpv")
             {
                 UseShellExecute = false, CreateNoWindow = true
             };
             psi.Environment["XDG_RUNTIME_DIR"] = "/run/user/1000";
+
+            if (!useScript)
+            {
+                psi.ArgumentList.Add("--no-video");
+                psi.ArgumentList.Add("--no-terminal");
+            }
+
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            string startArg = song.Start.ToString("0.###", inv);
+            if (song.Start > 0)
+                psi.ArgumentList.Add($"--start={startArg}");
+
+            // afade runs on the file's own clock, so the fade must start at the offset,
+            // not at zero, or it is already finished by the time playback begins.
+            if (song.FadeIn > 0)
+                psi.ArgumentList.Add(
+                    $"--af=lavfi=[afade=t=in:st={startArg}:d={song.FadeIn.ToString("0.###", inv)}]");
+
+            psi.ArgumentList.Add(song.Path);
             _audioProcess = Process.Start(psi);
         }
         catch { /* Audio is best-effort — don't crash the clock */ }
+    }
+
+    // ════════════════════════════════════════════════════
+    //  Nap: three plays in five minutes → ten minute cooldown
+    // ════════════════════════════════════════════════════
+
+    private void BeginNap()
+    {
+        var nap = this.FindControl<NapCountdown>("NapOverlay");
+        if (nap == null) return;
+
+        UpdateNap(nap);
+        nap.IsActive = true;
+
+        _napTimer?.Stop();
+        _napTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _napTimer.Tick += (_, _) =>
+        {
+            if (_limiter.IsLocked(DateTime.Now)) UpdateNap(nap);
+            else EndNap();
+        };
+        _napTimer.Start();
+    }
+
+    private void UpdateNap(NapCountdown nap)
+    {
+        var now = DateTime.Now;
+        var left = _limiter.Remaining(now);
+        nap.Fraction = _limiter.RemainingFraction(now);
+        nap.RemainingText = $"{(int)left.TotalMinutes}:{left.Seconds:00}";
+    }
+
+    private void EndNap()
+    {
+        _napTimer?.Stop();
+        _napTimer = null;
+        _limiter.ClearLock();
+
+        var nap = this.FindControl<NapCountdown>("NapOverlay");
+        if (nap != null) nap.IsActive = false;
+    }
+
+    /// <summary>Tapped during the nap: play the "come back soon" clip, but not more than
+    /// once every few seconds so a determined tapper doesn't get a stuttering loop.</summary>
+    private void PlayComeBackLater()
+    {
+        var now = DateTime.Now;
+        if ((now - _lastClipAt).TotalSeconds < _library.Limit.ClipEverySeconds) return;
+        if (_library.ComeBackLaterPath is not { } clip) return;
+
+        _lastClipAt = now;
+        StartAudio(new Song(clip, 0, 0));
     }
 
     private void StopAudio()

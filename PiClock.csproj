@@ -14,4 +14,10 @@
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.2.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Shipped next to the binary; deploy.ps1 copies them to the Pi -->
+    <None Include="play-audio.sh" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="assets\songs.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

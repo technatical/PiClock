@@ -8,7 +8,9 @@ Three display modes (the default is the calendar):
 - **Digital** — seven-segment time digits with sixteen-segment day-of-week and seven-segment date
 - **Calendar** — month grid with today highlighted, analog clock alongside
 
-**Toddler mode:** tapping the screen drives a bus in from the bottom and plays *Wheels on the Bus* through a Bluetooth speaker (an Echo Studio). The bus parks for the length of the song and drives off near the end. Tap again to send it away early. Swipe gestures (cycle modes, dismiss the bus) exist in the code but are commented out so small hands can't get lost.
+**Toddler mode:** tapping the screen drives a bus in from the bottom and plays a song (*Wheels on the Bus*, or a random pick from a library) through a Bluetooth speaker (an Echo Studio). The bus parks for the length of the song and drives off near the end. Tap again to send it away early. Swipe gestures (cycle modes, dismiss the bus) exist in the code but are commented out so small hands can't get lost.
+
+**Nap time:** three plays that all start within 5 minutes put the bus to sleep for 10 minutes. A sleeping bus with a shrinking bar appears along the bottom (small digits in the corner for grown-ups), and tapping during the nap plays a short "come back soon" clip instead of the song. All of it is set in `assets/songs.json`.
 
 A little gray mouse with pink ears scurries across the bottom of the screen every few minutes. Sometimes it crosses all the way, sometimes it stops to look around, and sometimes it hesitates and runs back the way it came.
 
@@ -141,20 +143,14 @@ bluetoothctl connect B8:5F:98:E4:FD:B1
 
 Check it: `wpctl status` should list **Echo Studio** under Sinks (not "Dummy Output"), and `pactl list cards | grep "Active Profile"` should show `a2dp-sink` for the Bluetooth card.
 
-Copy the song and the wrapper script into the app folder. Neither is in the repo (the MP3 is copyrighted, and `deploy.ps1` never touches them), so keep a copy somewhere safe:
+Copy the MP3s into the app folder. They are not in the repo (copyrighted) and `deploy.ps1` never touches them, so keep a copy somewhere safe:
 
 ```bash
 mkdir -p ~/PiClock/assets
-# scp your MP3 to ~/PiClock/assets/wheels-on-the-bus.mp3
-cat > ~/PiClock/play-audio.sh << 'EOF'
-#!/bin/bash
-export XDG_RUNTIME_DIR=/run/user/1000
-exec mpv --no-video --no-terminal "$1"
-EOF
-chmod +x ~/PiClock/play-audio.sh
+# scp your MP3s to ~/PiClock/assets/  (the song(s) plus the "come back soon" clip)
 ```
 
-The wrapper exists because the app runs from a system service with no user environment; without `XDG_RUNTIME_DIR` mpv cannot find the user's PipeWire socket. Test from a shell (Ctrl+C to stop):
+`play-audio.sh` (in the repo, deployed next to the binary) wraps mpv because the app runs from a system service with no user environment; without `XDG_RUNTIME_DIR` mpv cannot find the user's PipeWire socket. Test from a shell (Ctrl+C to stop):
 
 ```bash
 ~/PiClock/play-audio.sh ~/PiClock/assets/wheels-on-the-bus.mp3
@@ -162,7 +158,31 @@ The wrapper exists because the app runs from a system service with no user envir
 
 Before each play the app runs `bluetoothctl connect` so an idle-disconnected Echo comes back on its own; nothing needs to be reconnected by hand.
 
-#### 7. Publish and copy (manual alternative to deploy.ps1)
+#### 7. Song library and nap settings
+
+`assets/songs.json` (in the repo, deployed with the app) lists the songs and the play limit:
+
+```jsonc
+{
+  "songs": [
+    // start  = seconds to skip; fadeIn = seconds to ramp up from silence at that point
+    { "file": "wheels-on-the-bus.mp3", "start": 6.5, "fadeIn": 1.5 },
+    { "file": "old-macdonald.mp3" }
+  ],
+  "limit": {
+    "plays": 3,               // this many plays...
+    "spanMinutes": 5,         // ...all starting within this window...
+    "cooldownMinutes": 10,    // ...and the bus naps for this long
+    "comeBackLater": "come-back-soon.mp3",
+    "clipEverySeconds": 20    // don't replay the clip faster than this
+  }
+}
+```
+
+Each tap picks a random song (never the same one twice in a row) and the bus animation adapts to that song's length minus its offset. Songs listed but missing on the Pi are skipped with a note on stderr (`journalctl -u piclock`). If the file is absent, every MP3 in `assets/` is a song with no offset. The fade is done by mpv's `afade` filter; note that it runs on the file's own clock, so the app starts the fade at the offset rather than at zero.
+
+#### 8. Publish and copy (manual alternative to deploy.ps1)
+
 
 ```bash
 # On Windows
@@ -184,7 +204,11 @@ PiClock/
 │   ├── SixteenSegmentChar.cs    # Sixteen-segment character renderer (A-Z, 0-9)
 │   ├── ColonDisplay.cs          # Blinking colon between HH and MM
 │   ├── RunningMouse.cs          # Animated mouse with personality
-│   └── WheelsOnTheBus.cs        # Bus overlay, timing derived from the song length
+│   ├── WheelsOnTheBus.cs        # Bus overlay, timing derived from the song length
+│   └── NapCountdown.cs          # Sleeping bus + shrinking bar shown during the nap
+├── Audio/
+│   ├── SongLibrary.cs           # songs.json loader, random pick without repeats
+│   └── PlayLimiter.cs           # "3 plays in 5 minutes → 10 minute nap" rule
 ├── ViewModels/
 │   ├── ViewModelBase.cs         # INotifyPropertyChanged base
 │   └── ClockViewModel.cs        # Clock logic, mode toggle, 500ms timer
@@ -193,12 +217,13 @@ PiClock/
 │   └── MainWindow.axaml.cs      # Kiosk mode, tap/swipe handling, mpv + Bluetooth audio
 ├── App.axaml / App.axaml.cs     # Application entry, dark theme
 ├── Program.cs                   # Main entry point
+├── assets/songs.json            # Song list (offset/fade per song) + nap settings
+├── play-audio.sh                # mpv wrapper with the PipeWire environment
 ├── PiClock.csproj               # .NET 8 + Avalonia 11
 └── deploy.ps1                   # One-command publish & deploy to Pi
 
 On the Pi only (not in the repo):
-~/PiClock/assets/wheels-on-the-bus.mp3
-~/PiClock/play-audio.sh
+~/PiClock/assets/*.mp3
 ~/.config/wireplumber/wireplumber.conf.d/50-bluez-roles.conf
 ```
 

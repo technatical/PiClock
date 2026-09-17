@@ -151,5 +151,11 @@
     <controls:WheelsOnTheBus x:Name="BusOverlay"
                               IsPlaying="{Binding IsAnimationPlaying}"
                               IsHitTestVisible="False"/>
+
+    <!-- 💤 Nap countdown: shown along the bottom after too many plays in a row -->
+    <controls:NapCountdown x:Name="NapOverlay"
+                           Height="150"
+                           VerticalAlignment="Bottom"
+                           IsHitTestVisible="False"/>
     </Panel>
 </Window>

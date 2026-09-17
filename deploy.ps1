@@ -21,6 +21,6 @@ scp -r publish/* "${target}:${remotePath}/"
 if ($LASTEXITCODE -ne 0) { Write-Host "Copy failed!" -ForegroundColor Red; exit 1 }
 
 Write-Host "`n=== Setting permissions and starting ===" -ForegroundColor Cyan
-ssh $target "chmod +x ~/PiClock/PiClock; sudo systemctl start piclock"
+ssh $target "chmod +x ~/PiClock/PiClock ~/PiClock/play-audio.sh; sudo systemctl start piclock"
 
 Write-Host "`n=== Deployed! ===" -ForegroundColor Green
