@@ -14,6 +14,9 @@ assets/*.mp3
 assets/*.wav
 assets/*.ogg
 
+## Hue bridge app key (written on the Pi by --hue-pair)
+assets/hue.json
+
 ## OS
 Thumbs.db
 .DS_Store

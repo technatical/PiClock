@@ -6,6 +6,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using PiClock.Audio;
 using PiClock.Controls;
+using PiClock.Lights;
 using PiClock.ViewModels;
 
 namespace PiClock.Views;
@@ -39,6 +40,9 @@ public partial class MainWindow : Window
     private double _songDuration   = 39;   // overridden by ffprobe at runtime
     private Process? _audioProcess;
 
+    // ── Hue lights follow the bus (only when assets/hue.json exists) ──
+    private readonly HueLights? _hue;
+
     // ── Nap (too many plays in a row) ──
     private DispatcherTimer? _napTimer;
     private DateTime _lastClipAt = DateTime.MinValue;
@@ -50,6 +54,7 @@ public partial class MainWindow : Window
 
         _library = new SongLibrary(Path.Combine(AppContext.BaseDirectory, "assets"));
         _limiter = new PlayLimiter(_library.Limit);
+        _hue = HueLights.Load(Path.Combine(AppContext.BaseDirectory, "assets"));
 
         // Always hide the cursor — this is a clock, not a desktop app
         Cursor = new Cursor(StandardCursorType.None);
@@ -164,6 +169,7 @@ public partial class MainWindow : Window
             vm.StartBusAnimation();
 
         if (song != null) StartAudio(song);
+        _hue?.BusArrived();
         _limiter.RecordPlayStart(DateTime.Now);
         _busSlide.Y = Bounds.Height;
         _progress = 0;
@@ -176,6 +182,7 @@ public partial class MainWindow : Window
         _autoDismissTimer?.Stop();
         _autoDismissTimer = null;
         StopAudio();
+        _hue?.BusLeft();
         _progress = 0;
         _phase = Phase.BusExit;
         StartTimer();
@@ -466,6 +473,15 @@ public partial class MainWindow : Window
             _audioProcess = null;
         }
         catch { }
+    }
+
+    /// <summary>Closed mid-song (Escape, or the service stopping): don't leave the room yellow.</summary>
+    protected override void OnClosed(EventArgs e)
+    {
+        StopAudio();
+        _hue?.RestoreNow(TimeSpan.FromSeconds(3));
+        _hue?.Dispose();
+        base.OnClosed(e);
     }
 
     /// <summary>Ease-out cubic — fast start, smooth deceleration.</summary>

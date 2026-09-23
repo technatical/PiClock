@@ -210,7 +210,39 @@ Taps are debounced: every tap resets a timer and only a tap that follows `tapDeb
 
 Each tap picks a random song (never the same one twice in a row) and the bus animation adapts to the trimmed length (`end`, or the file length, minus `start`), so the bus's exit drive lands when the music actually stops. To find a silent tail: `ffmpeg -i song.mp3 -af silencedetect=n=-40dB:d=0.5 -f null -`. Songs listed but missing on the Pi are skipped with a note on stderr (`journalctl -u piclock`). If the file is absent, every MP3 in `assets/` is a song with no offset. The fade is done by mpv's `afade` filter; note that it runs on the file's own clock, so the app starts the fade at the offset rather than at zero.
 
-#### 8. Publish and copy (manual alternative to deploy.ps1)
+#### 8. Hue lights (optional)
+
+With a Philips Hue Bridge (Pro or the older square bridge) on the same network, the lights in one room or zone turn school-bus yellow when the bus arrives, shimmer through shades of yellow while the song plays, and go back to exactly how they were (on/off, brightness, colour or white temperature) when it leaves. Without `assets/hue.json` nothing changes.
+
+Pair once on the Pi. Find the bridge's IP in the Hue app (Settings > Bridges > ⓘ), run this, and press the round button on the bridge within 60 seconds:
+
+```bash
+sudo systemctl stop piclock
+~/PiClock/PiClock --hue-pair 192.168.7.50 "Nursery"
+sudo systemctl start piclock
+```
+
+It lists the bridge's rooms and zones and writes `~/PiClock/assets/hue.json`. That file holds the bridge key, so it is not in the repo and `deploy.ps1` never overwrites it. Leave the room name off to see the list first, then edit the file:
+
+```jsonc
+{
+  "bridge": "192.168.7.50",
+  "appKey": "…",               // from pairing
+  "room": "Nursery",           // Hue room or zone name (case doesn't matter)
+  "color": "#FFC20E",          // while the bus is on screen
+  "brightness": 80,            // 1-100 %
+  "transitionSeconds": 1.5,    // fade in both directions
+  // Optional: while the song plays, each colour bulb drifts to a different shade and
+  // brightness every few seconds. These are the defaults; "danceSeconds": 0 holds "color".
+  "danceColors": ["#FFC20E", "#FFD700", "#FFB300", "#FFE45C", "#FFA000", "#FFF06A"],
+  "danceSeconds": 2,
+  "danceBrightnessMin": 45     // dance brightness is between this and "brightness"
+}
+```
+
+White-only bulbs just change brightness. Any changes made to the lights while a song plays are overwritten when the bus leaves. Errors (bridge unreachable, room not found) go to `journalctl -u piclock`; the clock carries on without the lights.
+
+#### 9. Publish and copy (manual alternative to deploy.ps1)
 
 
 ```bash
@@ -238,6 +270,9 @@ PiClock/
 ├── Audio/
 │   ├── SongLibrary.cs           # songs.json loader, random pick without repeats
 │   └── PlayLimiter.cs           # "3 plays in 5 minutes → 10 minute nap" rule
+├── Lights/
+│   ├── HueLights.cs             # Hue CLIP v2: room goes bus-yellow, then restored
+│   └── HuePairing.cs            # `PiClock --hue-pair <ip> "Room"` → assets/hue.json
 ├── ViewModels/
 │   ├── ViewModelBase.cs         # INotifyPropertyChanged base
 │   └── ClockViewModel.cs        # Clock logic, mode toggle, 500ms timer
@@ -253,6 +288,7 @@ PiClock/
 
 On the Pi only (not in the repo):
 ~/PiClock/assets/*.mp3
+~/PiClock/assets/hue.json        (optional, written by --hue-pair)
 ~/.config/wireplumber/wireplumber.conf.d/50-bluez-roles.conf
 ~/.config/wireplumber/wireplumber.conf.d/51-bluez-no-suspend.conf
 ```
@@ -261,6 +297,7 @@ On the Pi only (not in the repo):
 
 - Raspberry Pi 5 (with 5A USB-C power supply)
 - WaveShare 8-DSI-TOUCH-A (8" 1280×800 capacitive touchscreen)
+- Philips Hue Bridge Pro (optional) for the bus-coloured lights
 - Amazon Echo Studio as the Bluetooth speaker (any A2DP speaker works; change the MAC in `MainWindow.axaml.cs`)
 - Raspberry Pi OS (64-bit, Bookworm) with Wayland/labwc, PipeWire + WirePlumber
 
