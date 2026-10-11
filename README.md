@@ -10,6 +10,8 @@ Three display modes (the default is the calendar):
 
 **Toddler mode:** tapping the screen drives a bus in from the bottom and plays a song (*Wheels on the Bus*, or a random pick from a library) through a Bluetooth speaker (an Echo Studio). The bus parks for the length of the song and drives off near the end. Tap again to send it away early. Swipe gestures (cycle modes, dismiss the bus) exist in the code but are commented out so small hands can't get lost.
 
+**Spotify songs with their own scenes:** holding a finger on the screen for a moment plays a song from Spotify instead (Ms. Rachel's *I Love a Rainbow*), with a scene made for it: the same sunny backdrop as the bus, but a rainbow paints itself in band by band, ripples and shimmers with smiling clouds on its feet and the colour names taking turns at the top, then wipes away as the song ends. The Hue lights dance through rainbow colours instead of yellow. Spotify plays through [Spotify Soloist](https://developer.spotify.com/documentation/soloist), Spotify's own Connect player for Linux, on the Pi.
+
 **Nap time:** three plays that all start within 5 minutes put the bus to sleep for 90 seconds (both numbers are settings). A sleeping bus with a shrinking bar appears along the bottom (small digits in the corner for grown-ups), and tapping during the nap plays a short "come back soon" clip instead of the song. All of it is set in `assets/songs.json`.
 
 A little gray mouse with pink ears scurries across the bottom of the screen every few minutes. Sometimes it crosses all the way, sometimes it stops to look around, and sometimes it hesitates and runs back the way it came.
@@ -34,6 +36,7 @@ dotnet run
 | `F11` | Toggle fullscreen |
 | `Escape` | Exit |
 | Click/tap | Toggle the bus animation (and audio, if mpv is present) |
+| Long press (0.7 s) / `S` | Play a Spotify song and its scene (the scene plays silently without Soloist) |
 
 ## Deploy to Raspberry Pi 5
 
@@ -184,8 +187,11 @@ Before each play the app runs `bluetoothctl connect` so an idle-disconnected Ech
     // start/end = seconds into the file to play from/to (end trims a silent tail)
     // fadeIn/fadeOut = seconds of ramp at each end
     { "file": "wheels-on-the-bus.mp3", "start": 6.5, "fadeIn": 1.5, "end": 86, "fadeOut": 1 },
-    { "file": "old-macdonald.mp3", "gain": -3 }   // gain = dB, optional
+    { "file": "old-macdonald.mp3", "gain": -3 },  // gain = dB, optional
+    // Spotify song: Share > Copy Song Link. Plays on a long press; see step 9.
+    { "spotify": "https://open.spotify.com/track/3bblDd2pNGaTSWGOT6lf3y", "animation": "rainbow" }
   ],
+  "spotify": { "soloist": "ws://127.0.0.1:9090", "volume": 0 },
   "limit": {
     "plays": 3,               // this many plays...
     "spanMinutes": 5,         // ...all starting within this window...
@@ -207,6 +213,8 @@ ffmpeg -y -i come-back-soon.orig.mp3 -af "loudnorm=I=-12:TP=-1.0:LRA=7" -ar 4410
 ```
 
 Taps are debounced: every tap resets a timer and only a tap that follows `tapDebounceSeconds` of quiet is acted on. A flurry of taps starts the bus once and cannot dismiss it.
+
+`animation` picks the scene for a song: `bus` (the default) or `rainbow`. A tap picks from the local songs, a long press from the Spotify ones.
 
 Each tap picks a random song (never the same one twice in a row) and the bus animation adapts to the trimmed length (`end`, or the file length, minus `start`), so the bus's exit drive lands when the music actually stops. To find a silent tail: `ffmpeg -i song.mp3 -af silencedetect=n=-40dB:d=0.5 -f null -`. Songs listed but missing on the Pi are skipped with a note on stderr (`journalctl -u piclock`). If the file is absent, every MP3 in `assets/` is a song with no offset. The fade is done by mpv's `afade` filter; note that it runs on the file's own clock, so the app starts the fade at the offset rather than at zero.
 
@@ -242,7 +250,65 @@ It lists the bridge's rooms and zones and writes `~/PiClock/assets/hue.json`. Th
 
 White-only bulbs just change brightness. Any changes made to the lights while a song plays are overwritten when the bus leaves. Errors (bridge unreachable, room not found) go to `journalctl -u piclock`; the clock carries on without the lights.
 
-#### 9. Publish and copy (manual alternative to deploy.ps1)
+#### 9. Spotify songs (optional)
+
+Spotify songs are played by **Spotify Soloist**, Spotify's headless Connect player. It streams into PipeWire like mpv does, so the music reaches the Echo over the same Bluetooth link, and PiClock drives it over Soloist's local WebSocket API (play this track, start here, pause). PiClock holds no Spotify secrets. Needs Spotify Premium.
+
+1. In the [Spotify for Developers dashboard](https://developer.spotify.com/dashboard), open **Spotify Soloist API Key**, accept the terms and generate a key. Keep it private.
+2. Download the **arm64** build from Soloist's [downloads page](https://developer.spotify.com/documentation/soloist/reference/downloads-and-updates) (Spotify asks that the binary not be redistributed, so it is not in this repo) and put it on the Pi:
+
+```bash
+mkdir -p ~/soloist && tar -xzf soloist_release_arm64.tar.gz -C ~/soloist
+~/soloist/soloist --version
+```
+
+3. Keep the key in a file only you can read. This asks for it without echoing it, so it stays out of the shell history:
+
+```bash
+mkdir -p ~/.config/soloist && chmod 700 ~/.config/soloist
+install -m 600 /dev/null ~/.config/soloist/env
+read -rs -p "Soloist API key: " k && printf 'SOLOIST_API_KEY=%s
+' "$k" > ~/.config/soloist/env && unset k && echo
+```
+
+4. Run it as a *user* service, so it shares the PipeWire session with the Bluetooth sink:
+
+```bash
+mkdir -p ~/.config/systemd/user
+cat > ~/.config/systemd/user/soloist.service << 'EOF'
+[Unit]
+Description=Spotify Soloist (Spotify Connect player for PiClock)
+After=pipewire.service wireplumber.service
+
+[Service]
+EnvironmentFile=%h/.config/soloist/env
+ExecStart=%h/soloist/soloist --device-name PiClock --api-key ${SOLOIST_API_KEY} --ws 127.0.0.1:9090
+Restart=on-failure
+RestartSec=10
+# Exit code 10 = this build has expired; download a newer one
+RestartPreventExitStatus=10
+
+[Install]
+WantedBy=default.target
+EOF
+systemctl --user daemon-reload
+systemctl --user enable --now soloist
+sudo loginctl enable-linger $USER     # start it at boot, before anyone logs in
+```
+
+5. Pair it once: on a phone on the same Wi-Fi, open Spotify, tap the devices icon and pick **PiClock**. Soloist stores the login in `~/.local/share/soloist` and restores it on every restart.
+
+Check it with `journalctl --user -u soloist -f`. If PiClock cannot reach Soloist or it is not paired, the scene still plays and the reason goes to `journalctl -u piclock`.
+
+**Soloist builds expire 90 days after they are built.** When the service stops with exit code 10, download the new arm64 build, replace `~/soloist/soloist` and `systemctl --user restart soloist`.
+
+Notes:
+- `start`/`end` work for Spotify songs; `fadeIn`, `fadeOut` and `gain` do not. `"volume"` in the `spotify` section (1-100) sets Soloist's volume before each play.
+- Without `end`, the scene's length comes from Soloist once the track loads (the scene starts assuming 3 minutes and adjusts).
+- A play starts from the song's beginning and then jumps to `start`, so a fraction of a second of the intro can be heard.
+- Spotify playing on the Echo *itself* (through Alexa) still takes the Echo off Bluetooth; Soloist avoids that by playing through the Pi.
+
+#### 10. Publish and copy (manual alternative to deploy.ps1)
 
 
 ```bash
@@ -265,10 +331,13 @@ PiClock/
 │   ├── SixteenSegmentChar.cs    # Sixteen-segment character renderer (A-Z, 0-9)
 │   ├── ColonDisplay.cs          # Blinking colon between HH and MM
 │   ├── RunningMouse.cs          # Animated mouse with personality
-│   ├── WheelsOnTheBus.cs        # Bus overlay, timing derived from the song length
+│   ├── SongScene.cs             # Base for song scenes: play/stop, song length, shared sky/sun/clouds/grass
+│   ├── WheelsOnTheBus.cs        # Bus scene, timing derived from the song length
+│   ├── ILoveARainbow.cs         # Rainbow scene: paints in, shimmers, wipes away at the song's end
 │   └── NapCountdown.cs          # Sleeping bus + shrinking bar shown during the nap
 ├── Audio/
 │   ├── SongLibrary.cs           # songs.json loader, random pick without repeats
+│   ├── SpotifyPlayer.cs         # Spotify songs via Spotify Soloist's local WebSocket API
 │   └── PlayLimiter.cs           # "3 plays in 5 minutes → 10 minute nap" rule
 ├── Lights/
 │   ├── HueLights.cs             # Hue CLIP v2: room goes bus-yellow, then restored
@@ -289,6 +358,9 @@ PiClock/
 On the Pi only (not in the repo):
 ~/PiClock/assets/*.mp3
 ~/PiClock/assets/hue.json        (optional, written by --hue-pair)
+~/soloist/soloist                (optional, Spotify Soloist arm64 build)
+~/.config/soloist/env            (Soloist API key, mode 600)
+~/.config/systemd/user/soloist.service
 ~/.config/wireplumber/wireplumber.conf.d/50-bluez-roles.conf
 ~/.config/wireplumber/wireplumber.conf.d/51-bluez-no-suspend.conf
 ```

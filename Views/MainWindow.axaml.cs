@@ -33,12 +33,25 @@ public partial class MainWindow : Window
     private const double InMs      = 250;   // smooth slide-in
     private const double BusMs     = 400;   // bus enter/exit
 
+    // A press held this long (without moving) plays a Spotify song instead of a local one
+    private const double LongPressMs = 700;
+
     // ── Audio playback (Bluetooth → Echo Studio) ──
     private const string EchoMac   = "B8:5F:98:E4:FD:B1";
     private readonly SongLibrary _library;
     private readonly PlayLimiter _limiter;
     private double _songDuration   = 39;   // overridden by ffprobe at runtime
     private Process? _audioProcess;
+
+    // ── Spotify songs (only when songs.json lists some), played by Spotify Soloist ──
+    private readonly SpotifyPlayer? _spotify;
+    /// <summary>Scene length while Spotify has not said how long a song without "end" is.</summary>
+    private const double UnknownSpotifyLength = 180;
+
+    // ── The scene on screen (bus, rainbow, …) and the song it belongs to ──
+    private SongScene? _scene;
+    private Song? _sceneSong;
+    private DateTime _sceneStartedAt;
 
     // ── Hue lights follow the bus (only when assets/hue.json exists) ──
     private readonly HueLights? _hue;
@@ -55,6 +68,8 @@ public partial class MainWindow : Window
         _library = new SongLibrary(Path.Combine(AppContext.BaseDirectory, "assets"));
         _limiter = new PlayLimiter(_library.Limit);
         _hue = HueLights.Load(Path.Combine(AppContext.BaseDirectory, "assets"));
+        if (_library.SpotifyCount > 0)
+            _spotify = new SpotifyPlayer(_library.Spotify);
 
         // Always hide the cursor — this is a clock, not a desktop app
         Cursor = new Cursor(StandardCursorType.None);
@@ -69,7 +84,7 @@ public partial class MainWindow : Window
 
         // Attach transition transforms (separate from anti-burn-in shift)
         this.FindControl<Panel>("ClockPanel")!.RenderTransform = _clockSlide;
-        this.FindControl<Control>("BusOverlay")!.RenderTransform = _busSlide;
+        this.FindControl<Control>("SceneOverlay")!.RenderTransform = _busSlide;
     }
 
     // ════════════════════════════════════════════════════
@@ -113,7 +128,7 @@ public partial class MainWindow : Window
             else if (_limiter.IsLocked(DateTime.Now))
                 PlayComeBackLater();
             else
-                BeginBusEnter();
+                BeginBusEnter(fromSpotify: ms >= LongPressMs);
             return;
         }
 
@@ -149,11 +164,17 @@ public partial class MainWindow : Window
     //  Bus enter / exit
     // ════════════════════════════════════════════════════
 
-    private void BeginBusEnter()
+    /// <summary>Starts a song and its scene. A long press asks for a Spotify song; without
+    /// Spotify songs in songs.json it plays a local one like a tap.</summary>
+    private void BeginBusEnter(bool fromSpotify = false)
     {
-        var song = _library.Pick();
+        var song = fromSpotify && _spotify != null ? _library.PickSpotify() : null;
+        song ??= _library.Pick();
+
         if (song is null)
             _songDuration = 39;
+        else if (song.SpotifyTrack != null)
+            _songDuration = song.End > 0 ? Math.Max(5, song.End - song.Start) : UnknownSpotifyLength;
         else
         {
             double end = ProbeAudioDuration(song.Path);
@@ -161,15 +182,25 @@ public partial class MainWindow : Window
             _songDuration = Math.Max(5, end - song.Start);
         }
 
-        // Tell the bus control how long the song is — it adapts all timing
-        var busOverlay = this.FindControl<Controls.WheelsOnTheBus>("BusOverlay");
-        if (busOverlay != null) busOverlay.SongDuration = _songDuration;
+        // Start the song's scene and tell it how long the song is — it adapts all timing
+        if (_scene != null) _scene.IsPlaying = false;
+        _scene = SceneFor(song?.Animation);
+        _sceneSong = song;
+        _sceneStartedAt = DateTime.UtcNow;
+        _scene.SongDuration = _songDuration;
+        _scene.IsPlaying = true;
 
         if (DataContext is ClockViewModel vm)
             vm.StartBusAnimation();
 
-        if (song != null) StartAudio(song);
-        _hue?.BusArrived();
+        if (song?.SpotifyTrack != null && _spotify != null)
+        {
+            StopAudio();
+            Task.Run(EnsureBluetoothConnected);
+            _spotify.Play(song, length => Dispatcher.UIThread.Post(() => SongLengthKnown(song, length)));
+        }
+        else if (song != null) StartAudio(song);
+        _hue?.BusArrived(_scene.LightColors);
         _limiter.RecordPlayStart(DateTime.Now);
         _busSlide.Y = Bounds.Height;
         _progress = 0;
@@ -293,6 +324,8 @@ public partial class MainWindow : Window
 
                     if (DataContext is ClockViewModel vm)
                         vm.StopBusAnimation();
+                    if (_scene != null) _scene.IsPlaying = false;
+                    _sceneSong = null;
 
                     StopTimer();
 
@@ -302,6 +335,32 @@ public partial class MainWindow : Window
                 }
                 break;
             }
+        }
+    }
+
+    /// <summary>The scene named in songs.json ("bus" when missing or unknown).</summary>
+    private SongScene SceneFor(string? animation) =>
+        animation switch
+        {
+            "rainbow" => this.FindControl<SongScene>("RainbowScene")!,
+            _         => this.FindControl<SongScene>("BusScene")!
+        };
+
+    /// <summary>Spotify has said how long the playing song is: stretch or shorten the scene
+    /// and its auto-dismiss to match, if that song is still on screen.</summary>
+    private void SongLengthKnown(Song song, double length)
+    {
+        if (song != _sceneSong || _scene == null || _phase == Phase.BusExit) return;
+
+        _songDuration = length;
+        _scene.SongDuration = length;
+
+        if (_autoDismissTimer != null)
+        {
+            _autoDismissTimer.Stop();
+            double left = length - (DateTime.UtcNow - _sceneStartedAt).TotalSeconds;
+            _autoDismissTimer.Interval = TimeSpan.FromSeconds(Math.Max(0.5, left));
+            _autoDismissTimer.Start();
         }
     }
 
@@ -473,12 +532,15 @@ public partial class MainWindow : Window
             _audioProcess = null;
         }
         catch { }
+        _spotify?.Stop();
     }
 
     /// <summary>Closed mid-song (Escape, or the service stopping): don't leave the room yellow.</summary>
     protected override void OnClosed(EventArgs e)
     {
         StopAudio();
+        _spotify?.StopNow(TimeSpan.FromSeconds(3));
+        _spotify?.Dispose();
         _hue?.RestoreNow(TimeSpan.FromSeconds(3));
         _hue?.Dispose();
         base.OnClosed(e);
@@ -524,6 +586,13 @@ public partial class MainWindow : Window
                     else if (!bvm.IsAnimationPlaying && _phase == Phase.None)
                         BeginBusEnter();
                 }
+                break;
+
+            // S = a Spotify song (same as a long press)
+            case Key.S:
+                if (_phase == Phase.None && DataContext is ClockViewModel svm
+                    && !svm.IsAnimationPlaying)
+                    BeginBusEnter(fromSpotify: true);
                 break;
 
             // Up / Down arrows = bus animation (matches swipe gestures)

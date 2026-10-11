@@ -97,8 +97,11 @@ public sealed class HueLights : IDisposable
         }
     }
 
-    /// <summary>The bus is arriving: remember the room's lights, then turn them bus-coloured.</summary>
-    public void BusArrived() => Enqueue(ArriveAsync);
+    /// <summary>The bus is arriving: remember the room's lights, then turn them bus-coloured.
+    /// A scene may bring its own colours (#RRGGBB): the first is the arrival colour and all
+    /// of them are danced through, in place of "color" and "danceColors".</summary>
+    public void BusArrived(IReadOnlyList<string>? colors = null) =>
+        Enqueue(() => ArriveAsync(colors is { Count: > 0 } ? colors : null));
 
     /// <summary>The bus is leaving: put the lights back the way they were.</summary>
     public void BusLeft() => Enqueue(RestoreAsync);
@@ -128,7 +131,7 @@ public sealed class HueLights : IDisposable
         }
     }
 
-    private async Task ArriveAsync()
+    private async Task ArriveAsync(IReadOnlyList<string>? colors)
     {
         var lights = await RoomLightsAsync();
         if (lights.Count == 0) return;
@@ -136,7 +139,7 @@ public sealed class HueLights : IDisposable
         // Keep the first snapshot if the bus comes back before a restore finished.
         _saved ??= lights.ToDictionary(l => l.Id, l => RestoreBody(l.State));
 
-        var (x, y) = HexToXy(_cfg.Color);
+        var (x, y) = HexToXy(colors?[0] ?? _cfg.Color);
         foreach (var light in lights)
         {
             var body = new JsonObject
@@ -153,7 +156,7 @@ public sealed class HueLights : IDisposable
         }
 
         var colorLights = lights.Where(l => l.State["color"] is not null).Select(l => l.Id).ToList();
-        var palette = _cfg.DanceColors.Select(HexToXy).Distinct().ToList();
+        var palette = (colors ?? _cfg.DanceColors).Select(HexToXy).Distinct().ToList();
         if (_cfg.DanceSeconds > 0 && palette.Count > 1 && colorLights.Count > 0 && _danceCts is null)
         {
             _danceCts = new CancellationTokenSource();

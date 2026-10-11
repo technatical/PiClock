@@ -147,10 +147,12 @@
     <controls:RunningMouse IsHitTestVisible="False"/>
     </Panel>
 
-    <!-- 🚌 Wheels on the Bus animation (swipe up to play, tap to dismiss) -->
-    <controls:WheelsOnTheBus x:Name="BusOverlay"
-                              IsPlaying="{Binding IsAnimationPlaying}"
-                              IsHitTestVisible="False"/>
+    <!-- 🚌🌈 Song scenes (tap to play, tap again to dismiss). The window starts the one
+         that goes with the song; the others stay idle and draw nothing. -->
+    <Panel x:Name="SceneOverlay" IsHitTestVisible="False">
+        <controls:WheelsOnTheBus x:Name="BusScene"/>
+        <controls:ILoveARainbow x:Name="RainbowScene"/>
+    </Panel>
 
     <!-- 💤 Nap countdown: shown along the bottom after too many plays in a row -->
     <controls:NapCountdown x:Name="NapOverlay"

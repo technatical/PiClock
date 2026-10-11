@@ -1,48 +1,18 @@
-using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
-using Avalonia.Threading;
 
 namespace PiClock.Controls;
 
 /// <summary>
-/// A colorful "Wheels on the Bus" animation — triggered by swipe-up.
+/// A colorful "Wheels on the Bus" animation — triggered by a tap.
 /// A bright school bus drives across with spinning wheels, swishing wipers,
 /// an opening door, and bouncing passengers. Song lyrics scroll at the top.
 /// Runs for the length of the song, then the clock resumes.  Tap to dismiss early.
 /// </summary>
-public class WheelsOnTheBus : Control
+public class WheelsOnTheBus : SongScene
 {
-    public static readonly StyledProperty<bool> IsPlayingProperty =
-        AvaloniaProperty.Register<WheelsOnTheBus, bool>(nameof(IsPlaying));
-
-    public bool IsPlaying
-    {
-        get => GetValue(IsPlayingProperty);
-        set => SetValue(IsPlayingProperty, value);
-    }
-
-    public static readonly StyledProperty<double> SongDurationProperty =
-        AvaloniaProperty.Register<WheelsOnTheBus, double>(nameof(SongDuration), 39);
-
-    /// <summary>Song length in seconds — animation timing adapts automatically.</summary>
-    public double SongDuration
-    {
-        get => GetValue(SongDurationProperty);
-        set => SetValue(SongDurationProperty, value);
-    }
-
-    private readonly DispatcherTimer _timer;
-    private readonly Stopwatch _clock = new();
-    private int _tick;
-
-    private const double TickMs = 20;       // animation time unit (~50 fps when the Pi keeps up)
-
     // ── Timing computed from song duration ──
-    // _tick is derived from the wall clock, not counted, so the bus stays in step with the
-    // song even when the Pi cannot draw 50 frames a second.
-    private int TotalTicks    => (int)(SongDuration * 1000 / TickMs);
     private int EnterTicks    => Math.Min(100, TotalTicks / 10);            // ~2s or 10%
     private int ExitTicks     => Math.Min(600, TotalTicks / 3);             // last ~12s
     private int ExitStartTick => Math.Max(EnterTicks + 50, TotalTicks - ExitTicks);
@@ -60,11 +30,9 @@ public class WheelsOnTheBus : Control
         "The people on the bus go up and down!"
     ];
 
-    private int VerseIndex => Math.Clamp(_tick / TicksPerVerse, 0, 3);
+    private int VerseIndex => Math.Clamp(Tick / TicksPerVerse, 0, 3);
 
     // ── Static brushes (allocated once) ──
-    private static readonly IBrush SkyFill      = new SolidColorBrush(Color.Parse("#4A90D9"));
-    private static readonly IBrush GrassFill    = new SolidColorBrush(Color.Parse("#4CAF50"));
     private static readonly IBrush RoadFill     = new SolidColorBrush(Color.Parse("#555555"));
     private static readonly IBrush DashFill     = new SolidColorBrush(Color.Parse("#EEEE44"));
     private static readonly IBrush BusYellow    = new SolidColorBrush(Color.Parse("#FFD700"));
@@ -72,8 +40,6 @@ public class WheelsOnTheBus : Control
     private static readonly IBrush WindowFill   = new SolidColorBrush(Color.Parse("#87CEEB"));
     private static readonly IBrush TireFill     = new SolidColorBrush(Color.Parse("#333333"));
     private static readonly IBrush HubFill      = new SolidColorBrush(Color.Parse("#999999"));
-    private static readonly IBrush SunFill      = new SolidColorBrush(Color.Parse("#FFE44D"));
-    private static readonly IBrush CloudFill    = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255));
     private static readonly IBrush DoorFill     = new SolidColorBrush(Color.Parse("#CC4444"));
     private static readonly IBrush SkinFill     = new SolidColorBrush(Color.Parse("#FFDBAC"));
     private static readonly IBrush StopRedFill  = new SolidColorBrush(Color.Parse("#CC0000"));
@@ -88,33 +54,6 @@ public class WheelsOnTheBus : Control
         new SolidColorBrush(Color.Parse("#FFE66D")),
         new SolidColorBrush(Color.Parse("#A8E6CF")),
     ];
-
-    static WheelsOnTheBus()
-    {
-        IsPlayingProperty.Changed.AddClassHandler<WheelsOnTheBus>((ctrl, args) =>
-        {
-            if ((bool)args.NewValue!)
-            {
-                ctrl._tick = 0;
-                ctrl._clock.Restart();
-                ctrl._timer.Start();
-            }
-            else
-            {
-                ctrl._timer.Stop();
-                ctrl._clock.Stop();
-            }
-
-            ctrl.InvalidateVisual();
-        });
-    }
-
-    public WheelsOnTheBus()
-    {
-        IsHitTestVisible = false;
-        _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TickMs) };
-        _timer.Tick += (_, _) => { _tick = (int)(_clock.ElapsedMilliseconds / TickMs); InvalidateVisual(); };
-    }
 
     // ══════════════════════════════════════════════════════════════
     //  Main render
@@ -137,13 +76,13 @@ public class WheelsOnTheBus : Control
 
         // 3-phase travel: enter → park in center → drive off
         double busX;
-        if (_tick <= EnterTicks)
+        if (Tick <= EnterTicks)
         {
             // Drive from off-screen left to center (ease-out: decelerate to stop)
-            double t = EaseOut((double)_tick / EnterTicks);
+            double t = EaseOut((double)Tick / EnterTicks);
             busX = (-bw - margin) + t * (centerX + bw + margin);
         }
-        else if (_tick <= ExitStartTick)
+        else if (Tick <= ExitStartTick)
         {
             // Parked in center — the show!
             busX = centerX;
@@ -152,7 +91,7 @@ public class WheelsOnTheBus : Control
         {
             // Drive off to the right (ease-in: accelerate away). Timed so that when the song
             // ends only the back bumper is still visible; past the end it keeps going.
-            double t = EaseIn((double)(_tick - ExitStartTick) / (TotalTicks - ExitStartTick));
+            double t = EaseIn((double)(Tick - ExitStartTick) / (TotalTicks - ExitStartTick));
             double endX = w - bw * VisibleAtEnd;
             busX = centerX + t * (endX - centerX);
         }
@@ -164,66 +103,32 @@ public class WheelsOnTheBus : Control
         double busH     = 210 * s;
         double busY     = roadTop + roadH * 0.35 - busH;
 
-        // 1) Sky
-        context.DrawRectangle(SkyFill, null, new Rect(0, 0, w, grassTop));
+        // 1) Sky, sun with rotating rays, drifting clouds, grass
+        DrawBackdrop(context, w, h, grassTop, s);
 
-        // 2) Sun with rotating rays
-        DrawSun(context, w * 0.85, h * 0.13, 55 * s, s);
-
-        // 3) Drifting clouds
-        DrawCloud(context, Wrap(w * 0.15 + _tick * 0.4, w + 200, -150), h * 0.14, s);
-        DrawCloud(context, Wrap(w * 0.55 + _tick * 0.25, w + 200, -150), h * 0.08, s * 0.8);
-        DrawCloud(context, Wrap(w * 0.80 + _tick * 0.3, w + 200, -150), h * 0.20, s * 0.65);
-
-        // 4) Road with dashed center line
+        // 2) Road with dashed center line
         context.DrawRectangle(RoadFill, null, new Rect(0, roadTop, w, roadH));
         var dashPen = new Pen(DashFill, 4 * s)
         {
-            DashStyle = new DashStyle([18, 12], _tick * 0.8 % 30)
+            DashStyle = new DashStyle([18, 12], Tick * 0.8 % 30)
         };
         context.DrawLine(dashPen,
             new Point(0, roadTop + roadH / 2),
             new Point(w, roadTop + roadH / 2));
 
-        // 5) Grass
-        context.DrawRectangle(GrassFill, null, new Rect(0, grassTop, w, h - grassTop));
-
-        // 6) Exhaust puffs (drawn before bus so bus body occludes near ones)
+        // 3) Exhaust puffs (drawn before bus so bus body occludes near ones)
         DrawExhaust(context, busX - 10 * s, busY + busH - 40 * s, s);
 
-        // 7) The bus!
+        // 4) The bus!
         DrawBus(context, busX, busY, bw, busH, s);
 
-        // 8) Song lyrics at the top
+        // 5) Song lyrics at the top
         DrawLyrics(context, w, h * 0.04, s);
     }
 
     // ══════════════════════════════════════════════════════════════
     //  Scene elements
     // ══════════════════════════════════════════════════════════════
-
-    private void DrawSun(DrawingContext ctx, double cx, double cy, double r, double s)
-    {
-        // Rays rotate slowly
-        var rayPen = new Pen(SunFill, 4 * s);
-        for (int i = 0; i < 12; i++)
-        {
-            double a = i * 30.0 * Math.PI / 180 + _tick * 0.008;
-            ctx.DrawLine(rayPen,
-                new Point(cx + Math.Cos(a) * r * 1.2, cy + Math.Sin(a) * r * 1.2),
-                new Point(cx + Math.Cos(a) * r * 1.65, cy + Math.Sin(a) * r * 1.65));
-        }
-
-        ctx.DrawEllipse(SunFill, null, new Point(cx, cy), r, r);
-    }
-
-    private static void DrawCloud(DrawingContext ctx, double x, double y, double s)
-    {
-        double r = 30 * s;
-        ctx.DrawEllipse(CloudFill, null, new Point(x, y), r, r * 0.7);
-        ctx.DrawEllipse(CloudFill, null, new Point(x - r * 0.75, y + r * 0.25), r * 0.7, r * 0.55);
-        ctx.DrawEllipse(CloudFill, null, new Point(x + r * 0.75, y + r * 0.15), r * 0.8, r * 0.55);
-    }
 
     private void DrawBus(DrawingContext ctx, double x, double y, double bw, double bh, double s)
     {
@@ -249,7 +154,7 @@ public class WheelsOnTheBus : Control
         bool wiperVerse = VerseIndex == 1;
         double wSpeed = wiperVerse ? 0.14 : 0.06;
         double wSwing = wiperVerse ? 55 : 35;
-        double wDeg   = Math.Sin(_tick * wSpeed) * wSwing;
+        double wDeg   = Math.Sin(Tick * wSpeed) * wSwing;
         double wRad   = (-90 + wDeg) * Math.PI / 180;
         double wpx = wsX + wsW * 0.5, wpy = wsY + wsH - 5 * s;
         double wLen = 50 * s;
@@ -274,7 +179,7 @@ public class WheelsOnTheBus : Control
         double dy = y + 18 * s;
         bool doorVerse = VerseIndex == 2;
         double dSpeed  = doorVerse ? 0.08 : 0.03;
-        double doorOpen = (Math.Sin(_tick * dSpeed) + 1) / 2;   // 0→1
+        double doorOpen = (Math.Sin(Tick * dSpeed) + 1) / 2;   // 0→1
         double offset   = doorOpen * dw * 0.45;
 
         // Door frame always visible
@@ -292,7 +197,7 @@ public class WheelsOnTheBus : Control
             new Point(x - 4 * s, y + bh - 48 * s), lR * 0.8, lR * 0.8);
 
         // ── Stop sign (folds out periodically) ──
-        if (Math.Sin(_tick * 0.025) > 0.3)
+        if (Math.Sin(Tick * 0.025) > 0.3)
         {
             double sw = 32 * s, sh = 26 * s;
             double sx = x - sw - 6 * s, sy = y + 45 * s;
@@ -329,7 +234,7 @@ public class WheelsOnTheBus : Control
 
         // Spokes — spin faster during Wheels verse
         bool active = VerseIndex == 0;
-        double rot = _tick * (active ? 0.25 : 0.15);
+        double rot = Tick * (active ? 0.25 : 0.15);
         var spokePen = new Pen(HubFill, 2.5 * s);
         for (int i = 0; i < 5; i++)
         {
@@ -345,7 +250,7 @@ public class WheelsOnTheBus : Control
         // Bounce harder during People verse
         bool active = VerseIndex == 3;
         double amp = (active ? 10 : 5) * s;
-        double bounce = Math.Sin(_tick * 0.08 + i * 1.5) * amp;
+        double bounce = Math.Sin(Tick * 0.08 + i * 1.5) * amp;
         double headR = 7 * s;
         double hy = winTop + winH * 0.32 + bounce;
 
@@ -366,7 +271,7 @@ public class WheelsOnTheBus : Control
     {
         for (int i = 0; i < 4; i++)
         {
-            double age = (_tick * 0.5 + i * 8) % 40;
+            double age = (Tick * 0.5 + i * 8) % 40;
             double px = x - age * 2 * s - i * 15 * s;
             double py = y - Math.Sin(age * 0.3) * 8 * s;
             double pr = (4 + age * 0.3) * s;
@@ -380,7 +285,7 @@ public class WheelsOnTheBus : Control
     private void DrawLyrics(DrawingContext ctx, double w, double y, double s)
     {
         string text = $"♪  {Lyrics[VerseIndex]}  ♪";
-        double bounce = Math.Sin(_tick * 0.06) * 4 * s;
+        double bounce = Math.Sin(Tick * 0.06) * 4 * s;
         double fontSize = Math.Max(28, 36 * s);
         var typeface = new Typeface("Inter", FontStyle.Normal, FontWeight.ExtraBold);
 
@@ -406,24 +311,5 @@ public class WheelsOnTheBus : Control
 
         // Main text
         ctx.DrawText(fmt, new Point(tx, ty));
-    }
-
-    /// <summary>Ease-out cubic — fast start, smooth deceleration.</summary>
-    private static double EaseOut(double t) =>
-        1 - Math.Pow(1 - Math.Clamp(t, 0, 1), 3);
-
-    /// <summary>Ease-in quadratic — gentle start, accelerating away. Not capped at 1 so the
-    /// bus keeps driving if the scene is still up after the song.</summary>
-    private static double EaseIn(double t)
-    {
-        t = Math.Max(0, t);
-        return t * t;
-    }
-
-    /// <summary>Wraps val into the range [min, max).</summary>
-    private static double Wrap(double val, double max, double min)
-    {
-        double range = max - min;
-        return ((val - min) % range + range) % range + min;
     }
 }
