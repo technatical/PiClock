@@ -267,8 +267,7 @@ mkdir -p ~/soloist && tar -xzf soloist_release_arm64.tar.gz -C ~/soloist
 ```bash
 mkdir -p ~/.config/soloist && chmod 700 ~/.config/soloist
 install -m 600 /dev/null ~/.config/soloist/env
-read -rs -p "Soloist API key: " k && printf 'SOLOIST_API_KEY=%s
-' "$k" > ~/.config/soloist/env && unset k && echo
+read -rs -p "Soloist API key: " k && printf 'SOLOIST_API_KEY=%s\n' "$k" > ~/.config/soloist/env && unset k && echo
 ```
 
 4. Run it as a *user* service, so it shares the PipeWire session with the Bluetooth sink:
