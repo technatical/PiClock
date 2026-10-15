@@ -14,7 +14,7 @@ dotnet publish PiClock.csproj -c Release -r linux-arm64 --self-contained true -o
 if ($LASTEXITCODE -ne 0) { Write-Host "Build failed!" -ForegroundColor Red; exit 1 }
 
 Write-Host "`n=== Stopping PiClock on Pi ===" -ForegroundColor Cyan
-ssh $target "sudo systemctl stop piclock 2>/dev/null; sleep 1; pkill -f PiClock 2>/dev/null; rm -f ~/PiClock/PiClock; echo 'ready'"
+ssh $target "sudo systemctl stop piclock 2>/dev/null; sleep 1; pkill -x PiClock 2>/dev/null; rm -f ~/PiClock/PiClock; echo 'ready'"
 
 Write-Host "`n=== Copying files to Pi ===" -ForegroundColor Cyan
 scp -r publish/* "${target}:${remotePath}/"
