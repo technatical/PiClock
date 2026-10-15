@@ -33,8 +33,13 @@ public partial class MainWindow : Window
     private const double InMs      = 250;   // smooth slide-in
     private const double BusMs     = 400;   // bus enter/exit
 
-    // A press held this long (without moving) plays a Spotify song instead of a local one
+    // A press held this long (without moving) ends the nap and clears the play count
     private const double LongPressMs = 700;
+
+    // ── Song picker: a tap shows one button per scene ──
+    private SongPicker _picker = null!;
+    private DispatcherTimer? _pickerTimer;
+    private const double PickerSeconds = 15;   // closes by itself if nothing is picked
 
     // ── Audio playback (Bluetooth → Echo Studio) ──
     private const string EchoMac   = "B8:5F:98:E4:FD:B1";
@@ -85,6 +90,7 @@ public partial class MainWindow : Window
         // Attach transition transforms (separate from anti-burn-in shift)
         this.FindControl<Panel>("ClockPanel")!.RenderTransform = _clockSlide;
         this.FindControl<Control>("SceneOverlay")!.RenderTransform = _busSlide;
+        _picker = this.FindControl<SongPicker>("Picker")!;
     }
 
     // ════════════════════════════════════════════════════
@@ -113,12 +119,33 @@ public partial class MainWindow : Window
 
         if (DataContext is not ClockViewModel vm) return;
 
-        // ── Tap → toggle bus animation (kid-friendly mode) ──
+        // ── Tap → song picker, or dismiss the song (kid-friendly mode) ──
         if (absDx < 30 && absDy < 30)
         {
+            var now = DateTime.UtcNow;
+
+            // Picker up: a tap on a button plays that scene's song. Taps elsewhere, and
+            // taps before the buttons have bounced in, are ignored.
+            if (_picker.IsOpen)
+            {
+                if (_picker.IsReady && _picker.ButtonAt(end) is { } scene)
+                {
+                    _lastTapAt = now;
+                    ClosePicker();
+                    BeginBusEnter(scene);
+                }
+                return;
+            }
+
+            // Long press: a grown-up ending the nap early (or clearing the play count)
+            if (ms >= LongPressMs)
+            {
+                ResetNap();
+                return;
+            }
+
             // Rolling debounce: every tap resets the clock, only a tap after a quiet
             // spell is acted on. Mashing the screen can't cut the song short.
-            var now = DateTime.UtcNow;
             bool tooSoon = (now - _lastTapAt).TotalSeconds < _library.Limit.TapDebounceSeconds;
             _lastTapAt = now;
             if (tooSoon || _phase != Phase.None) return;
@@ -128,7 +155,7 @@ public partial class MainWindow : Window
             else if (_limiter.IsLocked(DateTime.Now))
                 PlayComeBackLater();
             else
-                BeginBusEnter(fromSpotify: ms >= LongPressMs);
+                OpenPicker();
             return;
         }
 
@@ -161,15 +188,42 @@ public partial class MainWindow : Window
     }
 
     // ════════════════════════════════════════════════════
+    //  Song picker
+    // ════════════════════════════════════════════════════
+
+    /// <summary>Shows a button per scene (up to three). With only one scene there is
+    /// nothing to choose, so its song starts straight away.</summary>
+    private void OpenPicker()
+    {
+        var scenes = _library.Scenes.Take(3).ToList();
+        if (scenes.Count <= 1)
+        {
+            BeginBusEnter(scenes.FirstOrDefault() ?? "bus");
+            return;
+        }
+
+        _picker.Open(scenes);
+        _pickerTimer?.Stop();
+        _pickerTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(PickerSeconds) };
+        _pickerTimer.Tick += (_, _) => ClosePicker();
+        _pickerTimer.Start();
+    }
+
+    private void ClosePicker()
+    {
+        _pickerTimer?.Stop();
+        _pickerTimer = null;
+        _picker.Close();
+    }
+
+    // ════════════════════════════════════════════════════
     //  Bus enter / exit
     // ════════════════════════════════════════════════════
 
-    /// <summary>Starts a song and its scene. A long press asks for a Spotify song; without
-    /// Spotify songs in songs.json it plays a local one like a tap.</summary>
-    private void BeginBusEnter(bool fromSpotify = false)
+    /// <summary>Starts a song for the scene ("bus", "rainbow", "spider", …) and the scene.</summary>
+    private void BeginBusEnter(string scene)
     {
-        var song = fromSpotify && _spotify != null ? _library.PickSpotify() : null;
-        song ??= _library.Pick();
+        var song = _library.Pick(scene);
 
         if (song is null)
             _songDuration = 39;
@@ -343,6 +397,7 @@ public partial class MainWindow : Window
         animation switch
         {
             "rainbow" => this.FindControl<SongScene>("RainbowScene")!,
+            "spider"  => this.FindControl<SongScene>("SpiderScene")!,
             _         => this.FindControl<SongScene>("BusScene")!
         };
 
@@ -498,6 +553,14 @@ public partial class MainWindow : Window
         nap.RemainingText = $"{(int)left.TotalMinutes}:{left.Seconds:00}";
     }
 
+    /// <summary>Long press: end the nap now if there is one, and forget recent plays so the
+    /// next ones don't bring it straight back.</summary>
+    private void ResetNap()
+    {
+        if (_napTimer != null) EndNap();
+        else _limiter.ClearLock();
+    }
+
     private void EndNap()
     {
         _napTimer?.Stop();
@@ -577,29 +640,41 @@ public partial class MainWindow : Window
                 }
                 break;
 
-            // B = bus animation toggle
+            // B = song picker / dismiss the song (like a tap, without the nap)
             case Key.B:
-                if (DataContext is ClockViewModel bvm)
+                if (_picker.IsOpen)
+                    ClosePicker();
+                else if (DataContext is ClockViewModel bvm && _phase == Phase.None)
                 {
-                    if (bvm.IsAnimationPlaying && _phase == Phase.None)
-                        BeginBusExit();
-                    else if (!bvm.IsAnimationPlaying && _phase == Phase.None)
-                        BeginBusEnter();
+                    if (bvm.IsAnimationPlaying) BeginBusExit();
+                    else OpenPicker();
                 }
                 break;
 
-            // S = a Spotify song (same as a long press)
-            case Key.S:
-                if (_phase == Phase.None && DataContext is ClockViewModel svm
-                    && !svm.IsAnimationPlaying)
-                    BeginBusEnter(fromSpotify: true);
+            // 1 / 2 / 3 = play the scene on that picker button straight away
+            case Key.D1 or Key.D2 or Key.D3 or Key.NumPad1 or Key.NumPad2 or Key.NumPad3:
+            {
+                int n = e.Key is Key.D1 or Key.NumPad1 ? 0 : e.Key is Key.D2 or Key.NumPad2 ? 1 : 2;
+                var scenes = _library.Scenes;
+                if (n < scenes.Count && _phase == Phase.None
+                    && DataContext is ClockViewModel nvm && !nvm.IsAnimationPlaying)
+                {
+                    ClosePicker();
+                    BeginBusEnter(scenes[n]);
+                }
+                break;
+            }
+
+            // R = end the nap early (same as a long press)
+            case Key.R:
+                ResetNap();
                 break;
 
-            // Up / Down arrows = bus animation (matches swipe gestures)
+            // Up / Down arrows = song picker / dismiss (matches swipe gestures)
             case Key.Up:
                 if (_phase == Phase.None && DataContext is ClockViewModel uvm
-                    && !uvm.IsAnimationPlaying)
-                    BeginBusEnter();
+                    && !uvm.IsAnimationPlaying && !_picker.IsOpen)
+                    OpenPicker();
                 break;
 
             case Key.Down:

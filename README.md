@@ -8,11 +8,11 @@ Three display modes (the default is the calendar):
 - **Digital** — seven-segment time digits with sixteen-segment day-of-week and seven-segment date
 - **Calendar** — month grid with today highlighted, analog clock alongside
 
-**Toddler mode:** tapping the screen drives a bus in from the bottom and plays a song (*Wheels on the Bus*, or a random pick from a library) through a Bluetooth speaker (an Echo Studio). The bus parks for the length of the song and drives off near the end. Tap again to send it away early. Swipe gestures (cycle modes, dismiss the bus) exist in the code but are commented out so small hands can't get lost.
+**Toddler mode:** tapping the screen brings up three big round buttons that bounce in and animate: a bus with turning wheels, a rippling rainbow and a spider bobbing on its thread. Tapping one plays that song with its own full-screen scene through a Bluetooth speaker (an Echo Studio). The bus drives in from the bottom with *Wheels on the Bus* (or a random pick from a library), parks for the length of the song and drives off near the end. Tap again to end a song early. Taps beside the buttons are ignored, and the picker closes by itself after 15 seconds. Swipe gestures (cycle modes, dismiss the bus) exist in the code but are commented out so small hands can't get lost.
 
-**Spotify songs with their own scenes:** holding a finger on the screen for a moment plays a song from Spotify instead (Ms. Rachel's *I Love a Rainbow*), with a scene made for it: the same sunny backdrop as the bus, but a rainbow paints itself in band by band, ripples and shimmers with smiling clouds on its feet and the colour names taking turns at the top, then wipes away as the song ends. The Hue lights dance through rainbow colours instead of yellow. Spotify plays through [Spotify Soloist](https://developer.spotify.com/documentation/soloist), Spotify's own Connect player for Linux, on the Pi.
+**Spotify songs with their own scenes:** the rainbow and spider buttons play songs from Spotify. For Ms. Rachel's *I Love a Rainbow*, a rainbow paints itself in band by band on the same sunny backdrop as the bus, ripples and shimmers with smiling clouds on its feet and the colour names taking turns at the top, then wipes away as the song ends. For *Itsy Bitsy Spider*, a friendly spider climbs the water spout of a little house. Down comes the rain (grey sky, raindrops, water gushing from the spout) and washes it out onto the grass, the sun comes out smiling and dries it off, and it climbs up again. The song is split into whole verses of about 22 seconds, so the last one ends with the music. The Hue lights dance through each scene's own colours instead of yellow. Spotify plays through [Spotify Soloist](https://developer.spotify.com/documentation/soloist), Spotify's own Connect player for Linux, on the Pi.
 
-**Nap time:** three plays that all start within 5 minutes put the bus to sleep for 90 seconds (both numbers are settings). A sleeping bus with a shrinking bar appears along the bottom (small digits in the corner for grown-ups), and tapping during the nap plays a short "come back soon" clip instead of the song. All of it is set in `assets/songs.json`.
+**Nap time:** three plays that all start within 5 minutes put the bus to sleep for 90 seconds (both numbers are settings). A sleeping bus with a shrinking bar appears along the bottom (small digits in the corner for grown-ups), and tapping during the nap plays a short "come back soon" clip instead of the song. A grown-up can end the nap early by holding a finger on the screen for a moment (a long press); that also clears the play count. All of it is set in `assets/songs.json`.
 
 A little gray mouse with pink ears scurries across the bottom of the screen every few minutes. Sometimes it crosses all the way, sometimes it stops to look around, and sometimes it hesitates and runs back the way it came.
 
@@ -35,8 +35,9 @@ dotnet run
 |-----|--------|
 | `F11` | Toggle fullscreen |
 | `Escape` | Exit |
-| Click/tap | Toggle the bus animation (and audio, if mpv is present) |
-| Long press (0.7 s) / `S` | Play a Spotify song and its scene (the scene plays silently without Soloist) |
+| Click/tap / `B` / `Up` | Show the song picker; while a song plays, end it |
+| `1` / `2` / `3` | Play the bus / rainbow / spider straight away (scenes play silently without mpv or Soloist) |
+| Long press (0.7 s) / `R` | End the nap early and clear the play count |
 
 ## Deploy to Raspberry Pi 5
 
@@ -188,8 +189,9 @@ Before each play the app runs `bluetoothctl connect` so an idle-disconnected Ech
     // fadeIn/fadeOut = seconds of ramp at each end
     { "file": "wheels-on-the-bus.mp3", "start": 6.5, "fadeIn": 1.5, "end": 86, "fadeOut": 1 },
     { "file": "old-macdonald.mp3", "gain": -3 },  // gain = dB, optional
-    // Spotify song: Share > Copy Song Link. Plays on a long press; see step 9.
-    { "spotify": "https://open.spotify.com/track/3bblDd2pNGaTSWGOT6lf3y", "animation": "rainbow" }
+    // Spotify songs: Share > Copy Song Link; see step 9.
+    { "spotify": "https://open.spotify.com/track/3bblDd2pNGaTSWGOT6lf3y", "animation": "rainbow" },
+    { "spotify": "https://open.spotify.com/track/2t03vqSeWEX0HjtdozYSpr", "animation": "spider" }
   ],
   "spotify": { "soloist": "ws://127.0.0.1:9090", "volume": 0 },
   "limit": {
@@ -214,9 +216,9 @@ ffmpeg -y -i come-back-soon.orig.mp3 -af "loudnorm=I=-12:TP=-1.0:LRA=7" -ar 4410
 
 Taps are debounced: every tap resets a timer and only a tap that follows `tapDebounceSeconds` of quiet is acted on. A flurry of taps starts the bus once and cannot dismiss it.
 
-`animation` picks the scene for a song: `bus` (the default) or `rainbow`. A tap picks from the local songs, a long press from the Spotify ones.
+`animation` picks the scene for a song: `bus` (the default), `rainbow` or `spider`. The picker shows one button per scene: the bus first (always, so it drives silently even without an MP3), then the others in the order songs.json first names them, up to three.
 
-Each tap picks a random song (never the same one twice in a row) and the bus animation adapts to the trimmed length (`end`, or the file length, minus `start`), so the bus's exit drive lands when the music actually stops. To find a silent tail: `ffmpeg -i song.mp3 -af silencedetect=n=-40dB:d=0.5 -f null -`. Songs listed but missing on the Pi are skipped with a note on stderr (`journalctl -u piclock`). If the file is absent, every MP3 in `assets/` is a song with no offset. The fade is done by mpv's `afade` filter; note that it runs on the file's own clock, so the app starts the fade at the offset rather than at zero.
+Each button picks a random song for its scene (never the same one twice in a row) and the bus animation adapts to the trimmed length (`end`, or the file length, minus `start`), so the bus's exit drive lands when the music actually stops. To find a silent tail: `ffmpeg -i song.mp3 -af silencedetect=n=-40dB:d=0.5 -f null -`. Songs listed but missing on the Pi are skipped with a note on stderr (`journalctl -u piclock`). If the file is absent, every MP3 in `assets/` is a song with no offset. The fade is done by mpv's `afade` filter; note that it runs on the file's own clock, so the app starts the fade at the offset rather than at zero.
 
 #### 8. Hue lights (optional)
 
@@ -333,9 +335,11 @@ PiClock/
 │   ├── SongScene.cs             # Base for song scenes: play/stop, song length, shared sky/sun/clouds/grass
 │   ├── WheelsOnTheBus.cs        # Bus scene, timing derived from the song length
 │   ├── ILoveARainbow.cs         # Rainbow scene: paints in, shimmers, wipes away at the song's end
+│   ├── ItsyBitsySpider.cs       # Spider scene: climb, rain, sun, climb again, verse by verse
+│   ├── SongPicker.cs            # Animated scene buttons shown after a tap
 │   └── NapCountdown.cs          # Sleeping bus + shrinking bar shown during the nap
 ├── Audio/
-│   ├── SongLibrary.cs           # songs.json loader, random pick without repeats
+│   ├── SongLibrary.cs           # songs.json loader, random pick per scene without repeats
 │   ├── SpotifyPlayer.cs         # Spotify songs via Spotify Soloist's local WebSocket API
 │   └── PlayLimiter.cs           # "3 plays in 5 minutes → 10 minute nap" rule
 ├── Lights/

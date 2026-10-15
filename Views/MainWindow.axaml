@@ -147,12 +147,16 @@
     <controls:RunningMouse IsHitTestVisible="False"/>
     </Panel>
 
-    <!-- 🚌🌈 Song scenes (tap to play, tap again to dismiss). The window starts the one
-         that goes with the song; the others stay idle and draw nothing. -->
+    <!-- 🚌🌈🕷 Song scenes (pick one after a tap, tap again to dismiss). The window starts
+         the one that goes with the song; the others stay idle and draw nothing. -->
     <Panel x:Name="SceneOverlay" IsHitTestVisible="False">
         <controls:WheelsOnTheBus x:Name="BusScene"/>
         <controls:ILoveARainbow x:Name="RainbowScene"/>
+        <controls:ItsyBitsySpider x:Name="SpiderScene"/>
     </Panel>
+
+    <!-- 🔘 Song picker: a big animated button per scene, shown over the clock after a tap -->
+    <controls:SongPicker x:Name="Picker" IsHitTestVisible="False"/>
 
     <!-- 💤 Nap countdown: shown along the bottom after too many plays in a row -->
     <controls:NapCountdown x:Name="NapOverlay"

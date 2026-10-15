@@ -31,8 +31,9 @@ public sealed class LimitConfig
 }
 
 /// <summary>
-/// Loads assets/songs.json and hands out a random song per play (never the same one twice
-/// in a row). If the file is missing, every MP3 in the assets folder is a song with no offset.
+/// Loads assets/songs.json and hands out a song per play for the scene picked on screen
+/// (random among that scene's songs, never the same one twice in a row). If the file is
+/// missing, every MP3 in the assets folder is a bus song with no offset.
 /// </summary>
 public sealed class SongLibrary
 {
@@ -41,7 +42,7 @@ public sealed class SongLibrary
         public string File { get; set; } = "";
         /// <summary>Spotify song link (Share > Copy Song Link) or spotify:track: URI, in place of File.</summary>
         public string Spotify { get; set; } = "";
-        /// <summary>Scene to show: "bus" (default) or "rainbow".</summary>
+        /// <summary>Scene to show: "bus" (default), "rainbow" or "spider".</summary>
         public string Animation { get; set; } = "bus";
         public double Start { get; set; }
         public double FadeIn { get; set; }
@@ -69,16 +70,20 @@ public sealed class SongLibrary
         NumberHandling = JsonNumberHandling.AllowReadingFromString
     };
 
-    private readonly List<Song> _songs = [];
-    private readonly List<Song> _spotifySongs = [];
+    private readonly List<Song> _songs = [];        // local and Spotify, in songs.json order
     private readonly Random _rng = new();
-    private Song? _last, _lastSpotify;
+    private readonly Dictionary<string, Song> _last = [];
 
     public LimitConfig Limit { get; } = new();
     public SpotifySettings Spotify { get; } = new();
     public string? ComeBackLaterPath { get; }
     public int Count => _songs.Count;
-    public int SpotifyCount => _spotifySongs.Count;
+    public int SpotifyCount => _songs.Count(x => x.SpotifyTrack != null);
+
+    /// <summary>Each scene that has at least one song, in the order songs.json first names it.
+    /// The bus is always first, even with no bus song found: it then drives silently.</summary>
+    public IReadOnlyList<string> Scenes =>
+        _songs.Select(x => x.Animation).Prepend("bus").Distinct().ToList();
 
     public SongLibrary(string assetsDir)
     {
@@ -115,7 +120,7 @@ public sealed class SongLibrary
                     continue;
                 }
                 double spEnd = e.End > e.Start ? e.End : 0;
-                _spotifySongs.Add(new Song("", Math.Max(0, e.Start), 0, 0, spEnd, 0, track, animation));
+                _songs.Add(new Song("", Math.Max(0, e.Start), 0, 0, spEnd, 0, track, animation));
                 continue;
             }
             if (string.IsNullOrWhiteSpace(e.File)) continue;
@@ -130,8 +135,8 @@ public sealed class SongLibrary
                                 end, end > 0 ? Math.Max(0, e.FadeOut) : 0, null, animation));
         }
 
-        // No list (or nothing usable in it): every MP3 in the folder is a song
-        if (_songs.Count == 0 && Directory.Exists(assetsDir))
+        // No local songs listed (or none usable): every MP3 in the folder is a bus song
+        if (!_songs.Any(x => x.SpotifyTrack == null) && Directory.Exists(assetsDir))
         {
             foreach (var mp3 in Directory.EnumerateFiles(assetsDir, "*.mp3").OrderBy(p => p))
             {
@@ -141,21 +146,18 @@ public sealed class SongLibrary
         }
     }
 
-    /// <summary>Random local song, avoiding an immediate repeat when there is a choice. Null if none.</summary>
-    public Song? Pick() => PickFrom(_songs, ref _last);
-
-    /// <summary>Random Spotify song, the same way. Null if the list has none.</summary>
-    public Song? PickSpotify() => PickFrom(_spotifySongs, ref _lastSpotify);
-
-    private Song? PickFrom(List<Song> songs, ref Song? last)
+    /// <summary>Random song for the scene, avoiding an immediate repeat when there is a
+    /// choice. Null if no song has that scene.</summary>
+    public Song? Pick(string animation)
     {
+        var songs = _songs.Where(x => x.Animation == animation).ToList();
         if (songs.Count == 0) return null;
-        if (songs.Count == 1) return last = songs[0];
 
+        _last.TryGetValue(animation, out var last);
         Song pick;
         do pick = songs[_rng.Next(songs.Count)];
-        while (pick == last);
-        return last = pick;
+        while (songs.Count > 1 && pick == last);
+        return _last[animation] = pick;
     }
 
     /// <summary>The 22-character track id from https://open.spotify.com/track/ID?si=…

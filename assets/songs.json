@@ -5,16 +5,19 @@
   // end    = seconds (from the start of the file) to stop at; trims a silent tail (optional)
   // fadeOut= seconds of fade-out ending at "end" (optional)
   // gain   = dB adjustment (optional; positive = louder, no peak limiting, keep it small)
-  // animation = the scene that plays with it: "bus" (default) or "rainbow"
+  // animation = the scene that plays with it: "bus" (default), "rainbow" or "spider"
   //
-  // A Spotify song has "spotify" (Share > Copy Song Link) instead of "file". A tap plays a
-  // local song, holding a finger on the screen for a moment plays a Spotify one. start/end
-  // work for Spotify songs; fadeIn, fadeOut and gain do not.
+  // A tap shows one button per scene (in the order listed here); tapping a button plays a
+  // song for that scene. A Spotify song has "spotify" (Share > Copy Song Link) instead of
+  // "file". start/end work for Spotify songs; fadeIn, fadeOut and gain do not.
   "songs": [
     { "file": "wheels-on-the-bus.mp3", "start": 6.5, "fadeIn": 1.5, "end": 86, "fadeOut": 1 },
 
     // Ms. Rachel, "I Love a Rainbow"
-    { "spotify": "https://open.spotify.com/track/3bblDd2pNGaTSWGOT6lf3y", "animation": "rainbow" }
+    { "spotify": "https://open.spotify.com/track/3bblDd2pNGaTSWGOT6lf3y", "animation": "rainbow" },
+
+    // "Itsy Bitsy Spider"
+    { "spotify": "https://open.spotify.com/track/2t03vqSeWEX0HjtdozYSpr", "animation": "spider" }
   ],
 
   // Spotify songs are played by Spotify Soloist on the Pi, controlled over its local
@@ -25,7 +28,8 @@
   },
 
   // Three plays that all start within 5 minutes => the bus naps for 90 seconds.
-  // Tapping during the nap plays the clip (at most once every 20 seconds).
+  // Tapping during the nap plays the clip (at most once every 20 seconds); holding a finger
+  // on the screen for a moment ends the nap early.
   "limit": {
     "plays": 3,
     "spanMinutes": 5,
