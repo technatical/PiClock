@@ -191,11 +191,11 @@ public partial class MainWindow : Window
     //  Song picker
     // ════════════════════════════════════════════════════
 
-    /// <summary>Shows a button per scene (up to three). With only one scene there is
+    /// <summary>Shows a button per scene (up to four). With only one scene there is
     /// nothing to choose, so its song starts straight away.</summary>
     private void OpenPicker()
     {
-        var scenes = _library.Scenes.Take(3).ToList();
+        var scenes = _library.Scenes.Take(4).ToList();
         if (scenes.Count <= 1)
         {
             BeginBusEnter(scenes.FirstOrDefault() ?? "bus");
@@ -398,6 +398,7 @@ public partial class MainWindow : Window
         {
             "rainbow" => this.FindControl<SongScene>("RainbowScene")!,
             "spider"  => this.FindControl<SongScene>("SpiderScene")!,
+            "head"    => this.FindControl<SongScene>("HeadScene")!,
             _         => this.FindControl<SongScene>("BusScene")!
         };
 
@@ -651,10 +652,16 @@ public partial class MainWindow : Window
                 }
                 break;
 
-            // 1 / 2 / 3 = play the scene on that picker button straight away
-            case Key.D1 or Key.D2 or Key.D3 or Key.NumPad1 or Key.NumPad2 or Key.NumPad3:
+            // 1-4 = play the scene on that picker button straight away
+            case Key.D1 or Key.D2 or Key.D3 or Key.D4 or Key.NumPad1 or Key.NumPad2 or Key.NumPad3 or Key.NumPad4:
             {
-                int n = e.Key is Key.D1 or Key.NumPad1 ? 0 : e.Key is Key.D2 or Key.NumPad2 ? 1 : 2;
+                int n = e.Key switch
+                {
+                    Key.D1 or Key.NumPad1 => 0,
+                    Key.D2 or Key.NumPad2 => 1,
+                    Key.D3 or Key.NumPad3 => 2,
+                    _                     => 3
+                };
                 var scenes = _library.Scenes;
                 if (n < scenes.Count && _phase == Phase.None
                     && DataContext is ClockViewModel nvm && !nvm.IsAnimationPlaying)

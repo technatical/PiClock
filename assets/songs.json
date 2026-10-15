@@ -5,7 +5,7 @@
   // end    = seconds (from the start of the file) to stop at; trims a silent tail (optional)
   // fadeOut= seconds of fade-out ending at "end" (optional)
   // gain   = dB adjustment (optional; positive = louder, no peak limiting, keep it small)
-  // animation = the scene that plays with it: "bus" (default), "rainbow" or "spider"
+  // animation = the scene that plays with it: "bus" (default), "rainbow", "spider" or "head"
   //
   // A tap shows one button per scene (in the order listed here); tapping a button plays a
   // song for that scene. A Spotify song has "spotify" (Share > Copy Song Link) instead of
@@ -17,7 +17,10 @@
     { "spotify": "https://open.spotify.com/track/3bblDd2pNGaTSWGOT6lf3y", "animation": "rainbow" },
 
     // "Itsy Bitsy Spider"
-    { "spotify": "https://open.spotify.com/track/2t03vqSeWEX0HjtdozYSpr", "animation": "spider" }
+    { "spotify": "https://open.spotify.com/track/2t03vqSeWEX0HjtdozYSpr", "animation": "spider" },
+
+    // The Wiggles, "Head, Shoulders, Knees And Toes"
+    { "spotify": "https://open.spotify.com/track/7zua2xKHb2xX9g5KBkQROb", "animation": "head" }
   ],
 
   // Spotify songs are played by Spotify Soloist on the Pi, controlled over its local

@@ -8,8 +8,8 @@ namespace PiClock.Controls;
 
 /// <summary>
 /// Shown over the clock after a tap: one big round button per song scene (bus, rainbow,
-/// spider), each with its own little animation. The buttons bounce in one after another,
-/// then bob gently until one is tapped. The window does the hit-testing via
+/// spider, the head-shoulders-knees-and-toes kid), each with its own little animation. The
+/// buttons bounce in one after another, then bob gently until one is tapped. The window does the hit-testing via
 /// <see cref="ButtonAt"/>; this control only draws.
 /// </summary>
 public class SongPicker : Control
@@ -137,6 +137,7 @@ public class SongPicker : Control
             case "bus":     DrawBusIcon(ctx, c, r, t); break;
             case "rainbow": DrawRainbowIcon(ctx, c, r, t); break;
             case "spider":  DrawSpiderIcon(ctx, c, r, t); break;
+            case "head":    HeadShouldersKneesToes.DrawIcon(ctx, c, r, t); break;
             default:        DrawNoteIcon(ctx, c, r, t); break;
         }
     }
